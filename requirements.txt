@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+scipy
+opencv-python
+einops
+numpy
+pillow
+facexlib
+gfpgan

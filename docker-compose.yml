@@ -1,0 +1,27 @@
+services:
+  teraid-face-api:
+    image: teraid-face-api:local
+    container_name: teraid-face-api
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./docker/local/Dockerfile
+    command: >
+      sh -c "
+        uvicorn app.main:app --host 0.0.0.0 --port 8005 --reload --reload-dir app
+      "
+    volumes:
+      - .:/app
+    ports:
+      - 8005:8005
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+    gpus: all
+    networks:
+      - teraid-face-api-network
+    restart: unless-stopped
+
+networks:
+  teraid-face-api-network:
+    driver: bridge
