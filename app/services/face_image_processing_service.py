@@ -10,6 +10,7 @@ from app.ml.gfpgan import Gfpgan
 from app.ml.realesrgan import RealEsrGan
 from app.models.requests.face_image_processing_request import ExtensionType
 from app.models.responses.face_image_processing_response import FaceImageProcessingResponse
+from app.helpers.validation_helper import ValidationHelper
 
 
 class FaceImageProcessingService:
@@ -23,10 +24,14 @@ class FaceImageProcessingService:
             ) -> FaceImageProcessingResponse:
 
         image_bytes = base64.b64decode(content)
-
         target_image = Image.open(BytesIO(image_bytes)).convert("RGB")
+
+        # バリデーション実施
+        ValidationHelper.validation_with_face(image=target_image)
+
         target_image_np = np.asarray(target_image)
         processing_image_np = target_image_np.copy()
+
 
         normalized_image_np = target_image_np.astype(np.float32) / 255.0
         if use_brightness_adjustment_lm:
