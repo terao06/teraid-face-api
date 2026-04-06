@@ -1,15 +1,15 @@
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 import torch
 
+from app.ml import realesrgan as realesrgan_module
 from app.ml.realesrgan import RealEsrGan
 
 
 class TestRealEsrGan:
-    """RealEsrGan の補助メソッドと処理フローを検証するテストクラス。"""
-
     def test_reverse_color_channels_reverses_rgb_and_bgr_order(self) -> None:
-        """色チャンネル順が末尾軸で反転されることを確認する。"""
         realesrgan = RealEsrGan()
         image_np = np.array(
             [
@@ -24,73 +24,60 @@ class TestRealEsrGan:
         assert np.array_equal(output, image_np[:, :, ::-1])
 
     def test_load_model_raises_when_model_path_does_not_exist(self) -> None:
-        """モデル重みが存在しない場合に例外を送出することを確認する。"""
         realesrgan = RealEsrGan()
         realesrgan.model_path = realesrgan.model_path.with_name("missing.pth")
 
         with pytest.raises(FileNotFoundError, match="missing.pth"):
             realesrgan._load_model()
 
+    @patch.object(torch.cuda, "is_available", return_value=True)
+    @patch.object(realesrgan_module, "RealESRGANer")
+    @patch.object(realesrgan_module, "RRDBNet")
     def test_load_model_builds_realesrganer_with_expected_args(
-        self, monkeypatch: pytest.MonkeyPatch
+        self,
+        mock_rrdbnet,
+        mock_realesrganer,
+        _mock_is_available,
     ) -> None:
-        """RealESRGANer が期待どおりの引数で構築されることを確認する。"""
         realesrgan = RealEsrGan()
-        captured = {}
 
         class DummyPath:
-            """存在確認と文字列表現だけを持つダミーパス。"""
-
             def exists(self) -> bool:
                 return True
 
             def __str__(self) -> str:
                 return "dummy/realesrgan.pth"
 
-        class DummyRRDBNet:
-            """RRDBNet の初期化引数を記録するダミークラス。"""
-
-            def __init__(self, **kwargs):
-                captured["rrdbnet_kwargs"] = kwargs
-                captured["rrdbnet_instance"] = self
-
-        class DummyRealESRGANer:
-            """RealESRGANer の初期化引数を記録するダミークラス。"""
-
-            def __init__(self, **kwargs):
-                captured["realesrganer_kwargs"] = kwargs
-
         realesrgan.model_path = DummyPath()
-        monkeypatch.setattr("app.ml.realesrgan.RRDBNet", DummyRRDBNet)
-        monkeypatch.setattr("app.ml.realesrgan.RealESRGANer", DummyRealESRGANer)
-        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+        rrdbnet_instance = object()
+        realesrganer_instance = object()
+        mock_rrdbnet.return_value = rrdbnet_instance
+        mock_realesrganer.return_value = realesrganer_instance
 
         model = realesrgan._load_model()
 
-        assert isinstance(model, DummyRealESRGANer)
-        assert captured["rrdbnet_kwargs"] == {
-            "num_in_ch": 3,
-            "num_out_ch": 3,
-            "num_feat": 64,
-            "num_block": 23,
-            "num_grow_ch": 32,
-            "scale": realesrgan.scale,
-        }
-        assert captured["realesrganer_kwargs"] == {
-            "scale": realesrgan.scale,
-            "model_path": str(realesrgan.model_path),
-            "model": captured["rrdbnet_instance"],
-            "tile": realesrgan.tile,
-            "tile_pad": realesrgan.tile_pad,
-            "pre_pad": realesrgan.pre_pad,
-            "half": True,
-            "device": realesrgan.device,
-        }
+        assert model is realesrganer_instance
+        mock_rrdbnet.assert_called_once_with(
+            num_in_ch=3,
+            num_out_ch=3,
+            num_feat=64,
+            num_block=23,
+            num_grow_ch=32,
+            scale=realesrgan.scale,
+        )
+        mock_realesrganer.assert_called_once_with(
+            scale=realesrgan.scale,
+            model_path=str(realesrgan.model_path),
+            model=rrdbnet_instance,
+            tile=realesrgan.tile,
+            tile_pad=realesrgan.tile_pad,
+            pre_pad=realesrgan.pre_pad,
+            half=True,
+            device=realesrgan.device,
+        )
 
-    def test_processing_loads_model_and_enhances_image(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """processing が BGR 変換後に enhance を呼び、最後に RGB へ戻すことを確認する。"""
+    @patch.object(RealEsrGan, "_load_model")
+    def test_processing_loads_model_and_enhances_image(self, mock_load_model) -> None:
         realesrgan = RealEsrGan()
         image_np = np.array(
             [
@@ -106,21 +93,15 @@ class TestRealEsrGan:
             ],
             dtype=np.uint8,
         )
-        captured = {}
 
         class DummyModel:
-            """enhance 呼び出し内容を記録して固定値を返すダミーモデル。"""
-
             def enhance(self, image, outscale):
-                captured["image"] = image
-                captured["outscale"] = outscale
+                assert np.array_equal(image, image_np[:, :, ::-1])
+                assert outscale == 4
                 return enhanced_bgr, "unused"
 
-        dummy_model = DummyModel()
-        monkeypatch.setattr(realesrgan, "_load_model", lambda: dummy_model)
+        mock_load_model.return_value = DummyModel()
 
         output = realesrgan.processing(image_np=image_np, outscale=4)
 
-        assert captured["outscale"] == 4
-        assert np.array_equal(captured["image"], image_np[:, :, ::-1])
         assert np.array_equal(output, enhanced_bgr[:, :, ::-1])
