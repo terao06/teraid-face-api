@@ -3,7 +3,7 @@ import base64
 import json
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 from PIL import Image
@@ -102,7 +102,7 @@ class TestFaceImageProcessing:
     @patch.object(FaceImageProcessingController, "processing")
     def test_face_image_process_wraps_controller_response(
         self,
-        mock_processing,
+        mock_processing: MagicMock,
         request_extension: ExtensionType,
         response_extension: ExtensionType,
     ) -> None:
@@ -157,7 +157,7 @@ class TestFaceImageProcessing:
     @patch.object(FaceImageProcessingController, "processing")
     def test_face_image_process_returns_http_exception_response(
         self,
-        mock_processing,
+        mock_processing: MagicMock,
         raised_exception: HTTPException,
         expected_status_code: int,
         expected_detail: str,

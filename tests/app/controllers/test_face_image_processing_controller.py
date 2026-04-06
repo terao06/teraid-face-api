@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -32,7 +32,7 @@ class TestFaceImageProcessingController:
     @patch.object(FaceImageProcessingService, "processing")
     def test_processing_delegates_to_service_with_request_values(
         self,
-        mock_processing,
+        mock_processing: MagicMock,
         extension: ExtensionType,
         use_brightness_adjustment_lm: bool,
         use_correction_lm: bool,
@@ -81,7 +81,7 @@ class TestFaceImageProcessingController:
     @patch.object(FaceImageProcessingService, "processing")
     def test_processing_converts_domain_exceptions_to_http_exception(
         self,
-        mock_processing,
+        mock_processing: MagicMock,
         raised_exception: Exception,
         expected_status_code: int,
         expected_detail: str,
