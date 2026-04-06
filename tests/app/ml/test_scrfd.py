@@ -23,7 +23,7 @@ class TestScrfd:
             ("one_face.png", 1),
         ],
     )
-    def test_get_face_counts_returns_expected_face_count(
+    def test_get_face_counts(
         self, image_name: str, expected_face_count: int
     ) -> None:
         image = Image.open(TEST_IMAGE_DIR / image_name).convert("RGB")

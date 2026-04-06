@@ -1,11 +1,17 @@
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+from PIL import Image
 import numpy as np
 import pytest
 import torch
 
 from app.ml import realesrgan as realesrgan_module
 from app.ml.realesrgan import RealEsrGan
+
+
+TEST_IMAGE_PATH = Path("tests/app/test_data/test_image/realesrgan/test_face.png")
+RESULT_IMAGE_PATH = Path("tests/app/test_data/test_image/realesrgan/result_face.png")
 
 
 class TestRealEsrGan:
@@ -35,9 +41,9 @@ class TestRealEsrGan:
     @patch.object(realesrgan_module, "RRDBNet")
     def test_load_model_builds_realesrganer_with_expected_args(
         self,
-        mock_rrdbnet,
-        mock_realesrganer,
-        _mock_is_available,
+        mock_rrdbnet: MagicMock,
+        mock_realesrganer: MagicMock,
+        _mock_is_available: MagicMock,
     ) -> None:
         realesrgan = RealEsrGan()
 
@@ -75,9 +81,10 @@ class TestRealEsrGan:
             half=True,
             device=realesrgan.device,
         )
+        _mock_is_available.assert_called_once()
 
     @patch.object(RealEsrGan, "_load_model")
-    def test_processing_loads_model_and_enhances_image(self, mock_load_model) -> None:
+    def test_processing_loads_model_and_enhances_image(self, mock_load_model: MagicMock) -> None:
         realesrgan = RealEsrGan()
         image_np = np.array(
             [
@@ -105,3 +112,17 @@ class TestRealEsrGan:
         output = realesrgan.processing(image_np=image_np, outscale=4)
 
         assert np.array_equal(output, enhanced_bgr[:, :, ::-1])
+    
+    def test_processing(self) -> None:
+        test_image_np = np.asarray(Image.open(TEST_IMAGE_PATH).convert("RGB"))
+        expected = np.asarray(Image.open(RESULT_IMAGE_PATH).convert("RGB"))
+
+        image_np = RealEsrGan().processing(image_np=test_image_np)
+        diff = np.abs(image_np.astype(np.int16) - expected.astype(np.int16))
+
+        assert isinstance(image_np, np.ndarray)
+        assert image_np.shape == expected.shape
+        assert image_np.dtype == np.uint8
+        assert diff.mean() < 2.0
+        assert np.percentile(diff, 99) <= 16.0
+

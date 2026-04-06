@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 from PIL import Image
@@ -76,9 +76,9 @@ class TestRetinexformer:
     @patch.object(Retinexformer, "_load_yaml_opt", return_value={"network_g": {}})
     def test_load_model_uses_params_ema_and_strips_module_prefix(
         self,
-        _mock_load_yaml_opt,
-        mock_build_network_from_yaml,
-        mock_torch_load,
+        _mock_load_yaml_opt: MagicMock,
+        mock_build_network_from_yaml: MagicMock,
+        mock_torch_load: MagicMock,
     ) -> None:
         former = Retinexformer()
         captured = {}
@@ -109,6 +109,7 @@ class TestRetinexformer:
         assert captured["device"] == former.device
         assert captured["eval_called"] is True
         assert list(captured["state_dict"].keys()) == ["weight"]
+        _mock_load_yaml_opt.assert_called_once()
 
     def test_enhance_image_pads_to_factor_and_crops_back(self) -> None:
         former = Retinexformer()
