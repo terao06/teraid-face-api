@@ -8,7 +8,7 @@ class FaceImageProcessingController:
         return face_image_processing_service.processing(
             content=request.content,
             extension=request.extension,
-            use_brightness_adjustment=request.use_brightness_adjustment,
-            use_correction=request.use_correction
+            use_brightness_adjustment_lm=request.use_brightness_adjustment_lm,
+            use_correction_lm=request.use_correction_lm,
+            use_resolution_lm=request.use_resolution_lm
         )
-
