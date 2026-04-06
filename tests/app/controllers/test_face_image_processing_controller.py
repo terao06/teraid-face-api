@@ -14,10 +14,15 @@ class TestFaceImageProcessingController:
     """FaceImageProcessingController のサービス委譲を検証するテストクラス。"""
 
     @pytest.mark.parametrize(
-        ("extension", "use_brightness_adjustment", "use_correction"),
+        (
+            "extension",
+            "use_brightness_adjustment_lm",
+            "use_correction_lm",
+            "use_resolution_lm",
+        ),
         [
-            (ExtensionType.PNG, True, False),
-            (ExtensionType.JPEG, False, True),
+            (ExtensionType.PNG, True, False, True),
+            (ExtensionType.JPEG, False, True, False),
         ],
         ids=[
             "PNG入力で明るさ補正のみをサービスへ委譲する",
@@ -28,20 +33,23 @@ class TestFaceImageProcessingController:
         self,
         monkeypatch: pytest.MonkeyPatch,
         extension: ExtensionType,
-        use_brightness_adjustment: bool,
-        use_correction: bool,
+        use_brightness_adjustment_lm: bool,
+        use_correction_lm: bool,
+        use_resolution_lm: bool,
     ) -> None:
         """リクエストの各値がそのままサービスへ渡され、結果が返されることを確認する。"""
         # コントローラが受け取るリクエストと、サービスから返る想定レスポンスを用意する。
         request = FaceImageProcessingRequest(
             content="encoded-image",
             extension=extension,
-            use_brightness_adjustment=use_brightness_adjustment,
-            use_correction=use_correction,
+            use_brightness_adjustment_lm=use_brightness_adjustment_lm,
+            use_correction_lm=use_correction_lm,
+            use_resolution_lm=use_resolution_lm,
         )
         expected_response = FaceImageProcessingResponse(
             content="processed-image",
             extension=extension,
+            size_bytes=123,
         )
         captured: dict[str, object] = {}
 
@@ -53,14 +61,16 @@ class TestFaceImageProcessingController:
                 *,
                 content: str,
                 extension: ExtensionType,
-                use_brightness_adjustment: bool,
-                use_correction: bool,
+                use_brightness_adjustment_lm: bool,
+                use_correction_lm: bool,
+                use_resolution_lm: bool,
             ) -> FaceImageProcessingResponse:
                 # コントローラが渡した値を保持し、後で委譲内容を検証する。
                 captured["content"] = content
                 captured["extension"] = extension
-                captured["use_brightness_adjustment"] = use_brightness_adjustment
-                captured["use_correction"] = use_correction
+                captured["use_brightness_adjustment_lm"] = use_brightness_adjustment_lm
+                captured["use_correction_lm"] = use_correction_lm
+                captured["use_resolution_lm"] = use_resolution_lm
                 return expected_response
 
         # 実サービスを差し替え、コントローラの引数受け渡しだけを検証する。
@@ -77,6 +87,7 @@ class TestFaceImageProcessingController:
         assert captured == {
             "content": "encoded-image",
             "extension": extension,
-            "use_brightness_adjustment": use_brightness_adjustment,
-            "use_correction": use_correction,
+            "use_brightness_adjustment_lm": use_brightness_adjustment_lm,
+            "use_correction_lm": use_correction_lm,
+            "use_resolution_lm": use_resolution_lm,
         }

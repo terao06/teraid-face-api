@@ -32,6 +32,10 @@ class TestFaceImageProcessing:
         "tests/app/test_data/test_image/gfpgan/result_face.png"
     )
 
+    REALESRGAN_RESULT_IMAGE_PATH = Path(
+        "tests/app/test_data/test_image/realesrgan/result_face.png"
+    )
+
     def _encode_image(self, image: Image.Image, extension: ExtensionType) -> str:
         """PIL.Image を指定拡張子で base64 文字列へ変換する。"""
         # 実画像テスト用の入力を API リクエストと同じ形式へ変換する。
@@ -128,12 +132,14 @@ class TestFaceImageProcessing:
         request = FaceImageProcessingRequest(
             content="encoded-image",
             extension=request_extension,
-            use_brightness_adjustment=True,
-            use_correction=False,
+            use_brightness_adjustment_lm=True,
+            use_correction_lm=False,
+            use_resolution_lm=False,
         )
         expected_response = FaceImageProcessingResponse(
             content="processed-image",
             extension=response_extension,
+            size_bytes=123,
         )
         captured: dict[str, object] = {}
 
@@ -163,32 +169,37 @@ class TestFaceImageProcessing:
             "data": {
                 "content": "processed-image",
                 "extension": response_extension,
+                "size_bytes": 123,
             },
         }
 
     @pytest.mark.parametrize(
         (
-            "use_brightness_adjustment",
-            "use_correction",
+            "use_brightness_adjustment_lm",
+            "use_correction_lm",
+            "use_resolution_lm",
             "expected_status_code",
             "test_image_path",
             "expected_image_path",
         ),
         [
-            (False, False, 200, TEST_FACE_IMAGE_PATH, TEST_FACE_IMAGE_PATH),
-            (True, False, 200, TEST_FACE_IMAGE_PATH, RETINEXFORMER_RESULT_IMAGE_PATH),
-            (True, True, 200, TEST_FACE_IMAGE_PATH, GFPGAN_RESULT_IMAGE_PATH),
+            (False, False, False, 200, TEST_FACE_IMAGE_PATH, TEST_FACE_IMAGE_PATH),
+            (True, False, False, 200, TEST_FACE_IMAGE_PATH, RETINEXFORMER_RESULT_IMAGE_PATH),
+            (True, True, False, 200, TEST_FACE_IMAGE_PATH, GFPGAN_RESULT_IMAGE_PATH),
+            (True, True, True, 200, TEST_FACE_IMAGE_PATH, REALESRGAN_RESULT_IMAGE_PATH),
         ],
         ids=[
             "補正なしなら入力画像に近い結果を返す",
             "明るさ補正のみならRetinexformer結果に近い画像を返す",
             "明るさ補正と顔補正の両方ならGFPGAN結果に近い画像を返す",
+            "すべて使用した場合、real esr gan結果に近い画像を返す",
         ],
     )
     def test_face_image_process_with_real_image(
         self,
-        use_brightness_adjustment: bool,
-        use_correction: bool,
+        use_brightness_adjustment_lm: bool,
+        use_correction_lm: bool,
+        use_resolution_lm: bool,
         expected_status_code: int,
         test_image_path: Path,
         expected_image_path: Path | None,
@@ -204,8 +215,9 @@ class TestFaceImageProcessing:
             {
                 "content": encoded_image,
                 "extension": ExtensionType.PNG.value,
-                "use_brightness_adjustment": use_brightness_adjustment,
-                "use_correction": use_correction,
+                "use_brightness_adjustment_lm": use_brightness_adjustment_lm,
+                "use_correction_lm": use_correction_lm,
+                "use_resolution_lm": use_resolution_lm,
             }
         )
 
@@ -216,6 +228,8 @@ class TestFaceImageProcessing:
         result_image = self._decode_image(payload["data"]["content"])
         assert payload["status"] == "success"
         assert payload["data"]["extension"] == ExtensionType.PNG.value
+        assert isinstance(payload["data"]["size_bytes"], int)
+        assert payload["data"]["size_bytes"] > 0
         assert result_image.size == expected_image.size
         # 実画像比較では平均差分と高パーセンタイル差分の両方を確認する。
         diff = np.abs(
