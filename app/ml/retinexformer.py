@@ -8,9 +8,10 @@ from PIL import Image
 import torch
 import torch.nn.functional as F
 
-# リポジトリ直下を優先
-ML_ROOT = Path(__file__).resolve().parent
 from app.vendor.retinexformer.basicsr.models.archs.MST_Plus_Plus_arch import MST_Plus_Plus
+
+
+ML_ROOT = Path(__file__).resolve().parent
 
 
 class Retinexformer:
