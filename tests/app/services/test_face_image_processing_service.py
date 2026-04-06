@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 from PIL import Image
@@ -125,11 +125,11 @@ class TestFaceImageProcessingService:
     @patch.object(Retinexformer, "processing", side_effect=dummy_retinexformer_processing)
     def test_processing_returns_expected_image_and_extension(
         self,
-        _mock_retinexformer_processing,
-        _mock_gfpgan_processing,
-        _mock_realesrgan_processing,
-        _mock_validation_with_face,
-        _mock_fromarray,
+        _mock_retinexformer_processing: MagicMock,
+        _mock_gfpgan_processing: MagicMock,
+        _mock_realesrgan_processing: MagicMock,
+        _mock_validation_with_face: MagicMock,
+        _mock_fromarray: MagicMock,
         use_brightness_adjustment_lm: bool,
         use_correction_lm: bool,
         use_resolution_lm: bool,
@@ -185,6 +185,22 @@ class TestFaceImageProcessingService:
             else:
                 expected_realesrgan_input = np.full((2, 2, 3), (16, 32, 48), dtype=np.uint8)
             assert np.array_equal(CAPTURED_REALESRGAN_INPUTS[0], expected_realesrgan_input)
+    
+        if use_brightness_adjustment_lm:
+            _mock_retinexformer_processing.assert_called_once()
+        else:
+            _mock_retinexformer_processing.assert_not_called()
+        if use_correction_lm:
+            _mock_gfpgan_processing.assert_called_once()
+        else:
+            _mock_gfpgan_processing.assert_not_called()
+        if use_resolution_lm:
+            _mock_realesrgan_processing.assert_called_once()
+        else:
+            _mock_realesrgan_processing.assert_not_called()
+
+        _mock_validation_with_face.assert_called_once()
+        _mock_fromarray.assert_called_once()
 
     @pytest.mark.parametrize(
         ("extension", "expected_format"),
@@ -222,7 +238,7 @@ class TestFaceImageProcessingService:
     @patch.object(Image.Image, "save", autospec=True, side_effect=dummy_raise_on_save)
     def test_pil_image_to_base64_raises_value_error_when_save_fails(
         self,
-        _mock_save,
+        _mock_save: MagicMock,
         extension: ExtensionType,
     ) -> None:
         """画像保存失敗時に ValueError を送出することを検証する。"""
@@ -231,6 +247,8 @@ class TestFaceImageProcessingService:
 
         with pytest.raises(ValueError, match="Failed to encode image: save failed"):
             service._pil_image_to_base64(image=image, extension=extension)
+        
+        _mock_save.assert_called_once()
 
     @pytest.mark.parametrize(
         ("extension", "expected_format"),

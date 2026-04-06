@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 from PIL import Image
@@ -42,8 +42,8 @@ class TestGfpgan:
     @patch.object(gfpgan_module, "RetinaFace")
     def test_custom_detection_initializer_loads_weights_and_strips_module_prefix(
         self,
-        mock_retina_face,
-        mock_torch_load,
+        mock_retina_face: MagicMock,
+        mock_torch_load: MagicMock,
     ) -> None:
         gfpgan = Gfpgan()
         captured = {}
@@ -190,8 +190,8 @@ class TestGfpgan:
     @patch.object(gfpgan_module, "ParseNet")
     def test_custom_parsing_initializer_loads_weights(
         self,
-        mock_parse_net,
-        mock_torch_load,
+        mock_parse_net: MagicMock,
+        mock_torch_load: MagicMock,
     ) -> None:
         gfpgan = Gfpgan()
         captured = {}
@@ -234,8 +234,8 @@ class TestGfpgan:
     @patch.object(Gfpgan, "_patch_facexlib_initializers")
     def test_load_model_builds_gfpganer_with_expected_args(
         self,
-        mock_patch_facexlib_initializers,
-        mock_gfpganer,
+        mock_patch_facexlib_initializers: MagicMock,
+        mock_gfpganer: MagicMock,
     ) -> None:
         gfpgan = Gfpgan()
         gfpganer_instance = object()
@@ -258,8 +258,8 @@ class TestGfpgan:
     @patch.object(Gfpgan, "_load_model")
     def test_processing_loads_model_and_enhances_image(
         self,
-        mock_load_model,
-        mock_enhance_image,
+        mock_load_model: MagicMock,
+        mock_enhance_image: MagicMock,
     ) -> None:
         gfpgan = Gfpgan()
         image_np = np.arange(12, dtype=np.uint8).reshape(2, 2, 3)
