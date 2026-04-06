@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 from fastapi import HTTPException
 
@@ -11,11 +13,10 @@ from app.models.requests.face_image_processing_request import (
 from app.models.responses.face_image_processing_response import (
     FaceImageProcessingResponse,
 )
+from app.services.face_image_processing_service import FaceImageProcessingService
 
 
 class TestFaceImageProcessingController:
-    """FaceImageProcessingController のサービス委譲を検証するテストクラス。"""
-
     @pytest.mark.parametrize(
         (
             "extension",
@@ -27,21 +28,16 @@ class TestFaceImageProcessingController:
             (ExtensionType.PNG, True, False, True),
             (ExtensionType.JPEG, False, True, False),
         ],
-        ids=[
-            "PNG入力で明るさ補正のみをサービスへ委譲する",
-            "JPEG入力で顔補正のみをサービスへ委譲する",
-        ],
     )
+    @patch.object(FaceImageProcessingService, "processing")
     def test_processing_delegates_to_service_with_request_values(
         self,
-        monkeypatch: pytest.MonkeyPatch,
+        mock_processing,
         extension: ExtensionType,
         use_brightness_adjustment_lm: bool,
         use_correction_lm: bool,
         use_resolution_lm: bool,
     ) -> None:
-        """リクエストの各値がそのままサービスへ渡され、結果が返されることを確認する。"""
-        # コントローラが受け取るリクエストと、サービスから返る想定レスポンスを用意する。
         request = FaceImageProcessingRequest(
             content="encoded-image",
             extension=extension,
@@ -54,46 +50,18 @@ class TestFaceImageProcessingController:
             extension=extension,
             size_bytes=123,
         )
-        captured: dict[str, object] = {}
+        mock_processing.return_value = expected_response
 
-        class DummyFaceImageProcessingService:
-            """コントローラから委譲された引数を記録するダミーサービス。"""
-
-            def processing(
-                self,
-                *,
-                content: str,
-                extension: ExtensionType,
-                use_brightness_adjustment_lm: bool,
-                use_correction_lm: bool,
-                use_resolution_lm: bool,
-            ) -> FaceImageProcessingResponse:
-                # コントローラが渡した値を保持し、後で委譲内容を検証する。
-                captured["content"] = content
-                captured["extension"] = extension
-                captured["use_brightness_adjustment_lm"] = use_brightness_adjustment_lm
-                captured["use_correction_lm"] = use_correction_lm
-                captured["use_resolution_lm"] = use_resolution_lm
-                return expected_response
-
-        # 実サービスを差し替え、コントローラの引数受け渡しだけを検証する。
-        monkeypatch.setattr(
-            "app.controllers.face_image_processing_controller.FaceImageProcessingService",
-            DummyFaceImageProcessingService,
-        )
-
-        # 公開メソッドを実行し、サービス戻り値がそのまま返ることを確認する。
         response = FaceImageProcessingController().processing(request=request)
 
-        # レスポンスの透過と、リクエスト値の完全な委譲を確認する。
         assert response == expected_response
-        assert captured == {
-            "content": "encoded-image",
-            "extension": extension,
-            "use_brightness_adjustment_lm": use_brightness_adjustment_lm,
-            "use_correction_lm": use_correction_lm,
-            "use_resolution_lm": use_resolution_lm,
-        }
+        mock_processing.assert_called_once_with(
+            content="encoded-image",
+            extension=extension,
+            use_brightness_adjustment_lm=use_brightness_adjustment_lm,
+            use_correction_lm=use_correction_lm,
+            use_resolution_lm=use_resolution_lm,
+        )
 
     @pytest.mark.parametrize(
         ("raised_exception", "expected_status_code", "expected_detail"),
@@ -110,9 +78,10 @@ class TestFaceImageProcessingController:
             "multiple_faces_maps_to_409",
         ],
     )
+    @patch.object(FaceImageProcessingService, "processing")
     def test_processing_converts_domain_exceptions_to_http_exception(
         self,
-        monkeypatch: pytest.MonkeyPatch,
+        mock_processing,
         raised_exception: Exception,
         expected_status_code: int,
         expected_detail: str,
@@ -124,23 +93,7 @@ class TestFaceImageProcessingController:
             use_correction_lm=False,
             use_resolution_lm=False,
         )
-
-        class DummyFaceImageProcessingService:
-            def processing(
-                self,
-                *,
-                content: str,
-                extension: ExtensionType,
-                use_brightness_adjustment_lm: bool,
-                use_correction_lm: bool,
-                use_resolution_lm: bool,
-            ) -> FaceImageProcessingResponse:
-                raise raised_exception
-
-        monkeypatch.setattr(
-            "app.controllers.face_image_processing_controller.FaceImageProcessingService",
-            DummyFaceImageProcessingService,
-        )
+        mock_processing.side_effect = raised_exception
 
         with pytest.raises(HTTPException) as exc_info:
             FaceImageProcessingController().processing(request=request)
