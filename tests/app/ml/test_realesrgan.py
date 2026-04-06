@@ -125,4 +125,3 @@ class TestRealEsrGan:
         assert image_np.dtype == np.uint8
         assert diff.mean() < 2.0
         assert np.percentile(diff, 99) <= 16.0
-
