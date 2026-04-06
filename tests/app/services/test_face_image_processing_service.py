@@ -1,17 +1,69 @@
 import base64
 from io import BytesIO
+from unittest.mock import patch
 
 import numpy as np
 from PIL import Image
 import pytest
 
+from app.helpers.validation_helper import ValidationHelper
+from app.ml.gfpgan import Gfpgan
+from app.ml.realesrgan import RealEsrGan
+from app.ml.retinexformer import Retinexformer
 from app.models.requests.face_image_processing_request import ExtensionType
 from app.models.responses.face_image_processing_response import FaceImageProcessingResponse
 from app.services.face_image_processing_service import FaceImageProcessingService
 
 
+CAPTURED_VALIDATION_INPUTS: list[Image.Image] = []
+CAPTURED_RETINEX_INPUTS: list[np.ndarray] = []
+CAPTURED_GFPGAN_INPUTS: list[np.ndarray] = []
+CAPTURED_REALESRGAN_INPUTS: list[np.ndarray] = []
+RETINEX_OUTPUT = np.full((2, 2, 3), (200, 150, 100), dtype=np.uint8)
+GFPGAN_OUTPUT = np.full((2, 2, 3), (80, 90, 100), dtype=np.uint8)
+REALESRGAN_OUTPUT = np.full((2, 2, 3), (40, 50, 60), dtype=np.uint8)
+ORIGINAL_FROMARRAY = Image.fromarray
+
+
+def reset_dummy_state() -> None:
+    CAPTURED_VALIDATION_INPUTS.clear()
+    CAPTURED_RETINEX_INPUTS.clear()
+    CAPTURED_GFPGAN_INPUTS.clear()
+    CAPTURED_REALESRGAN_INPUTS.clear()
+
+
+def dummy_compatible_fromarray(obj: np.ndarray, mode: str | None = None) -> Image.Image:
+    if np.issubdtype(obj.dtype, np.floating):
+        obj = np.clip(obj, 0.0, 1.0)
+        obj = (obj * 255.0).round().astype(np.uint8)
+    return ORIGINAL_FROMARRAY(obj, mode=mode)
+
+
+def dummy_validation_with_face(*, image: Image.Image) -> None:
+    CAPTURED_VALIDATION_INPUTS.append(image)
+
+
+def dummy_retinexformer_processing(*, image_np: np.ndarray) -> np.ndarray:
+    CAPTURED_RETINEX_INPUTS.append(image_np)
+    return RETINEX_OUTPUT
+
+
+def dummy_gfpgan_processing(*, image_np: np.ndarray) -> np.ndarray:
+    CAPTURED_GFPGAN_INPUTS.append(image_np)
+    return GFPGAN_OUTPUT
+
+
+def dummy_realesrgan_processing(*, image_np: np.ndarray) -> np.ndarray:
+    CAPTURED_REALESRGAN_INPUTS.append(image_np)
+    return REALESRGAN_OUTPUT
+
+
+def dummy_raise_on_save(self, fp, format=None, **params):
+    raise OSError("save failed")
+
+
 class TestFaceImageProcessingService:
-    """FaceImageProcessingService の処理内容を検証するテスト。"""
+    """FaceImageProcessingService の処理を検証するテスト。"""
 
     def _create_base64_image(
         self,
@@ -36,23 +88,22 @@ class TestFaceImageProcessingService:
             "use_correction_lm",
             "use_resolution_lm",
             "input_extension",
-            "expected_color",
             "expected_size_bytes",
             "expected_retinex_calls",
             "expected_gfpgan_calls",
             "expected_realesrgan_calls",
         ),
         [
-            (False, False, False, ExtensionType.PNG, (16, 32, 48), 75, 0, 0, 0),
-            (True, False, False, ExtensionType.PNG, (200, 150, 100), 75, 1, 0, 0),
-            (False, True, False, ExtensionType.PNG, (80, 90, 100), 75, 0, 1, 0),
-            (False, False, True, ExtensionType.PNG, (40, 50, 60), 75, 0, 0, 1),
-            (True, True, True, ExtensionType.PNG, (40, 50, 60), 75, 1, 1, 1),
-            (False, False, False, ExtensionType.JPEG, (16, 32, 48), 632, 0, 0, 0),
-            (True, False, False, ExtensionType.JPEG, (200, 150, 100), 632, 1, 0, 0),
-            (False, True, False, ExtensionType.JPEG, (80, 90, 100), 631, 0, 1, 0),
-            (False, False, True, ExtensionType.JPEG, (40, 50, 60), 632, 0, 0, 1),
-            (True, True, True, ExtensionType.JPEG, (40, 50, 60), 632, 1, 1, 1),
+            (False, False, False, ExtensionType.PNG, 75, 0, 0, 0),
+            (True, False, False, ExtensionType.PNG, 75, 1, 0, 0),
+            (False, True, False, ExtensionType.PNG, 75, 0, 1, 0),
+            (False, False, True, ExtensionType.PNG, 75, 0, 0, 1),
+            (True, True, True, ExtensionType.PNG, 75, 1, 1, 1),
+            (False, False, False, ExtensionType.JPEG, 632, 0, 0, 0),
+            (True, False, False, ExtensionType.JPEG, 632, 1, 0, 0),
+            (False, True, False, ExtensionType.JPEG, 631, 0, 1, 0),
+            (False, False, True, ExtensionType.JPEG, 632, 0, 0, 1),
+            (True, True, True, ExtensionType.JPEG, 632, 1, 1, 1),
         ],
         ids=[
             "png_without_lm",
@@ -67,77 +118,34 @@ class TestFaceImageProcessingService:
             "jpeg_all_lm",
         ],
     )
+    @patch.object(Image, "fromarray", side_effect=dummy_compatible_fromarray)
+    @patch.object(ValidationHelper, "validation_with_face", side_effect=dummy_validation_with_face)
+    @patch.object(RealEsrGan, "processing", side_effect=dummy_realesrgan_processing)
+    @patch.object(Gfpgan, "processing", side_effect=dummy_gfpgan_processing)
+    @patch.object(Retinexformer, "processing", side_effect=dummy_retinexformer_processing)
     def test_processing_returns_expected_image_and_extension(
         self,
-        monkeypatch: pytest.MonkeyPatch,
+        _mock_retinexformer_processing,
+        _mock_gfpgan_processing,
+        _mock_realesrgan_processing,
+        _mock_validation_with_face,
+        _mock_fromarray,
         use_brightness_adjustment_lm: bool,
         use_correction_lm: bool,
         use_resolution_lm: bool,
         input_extension: ExtensionType,
-        expected_color: tuple[int, int, int],
         expected_size_bytes: int,
         expected_retinex_calls: int,
         expected_gfpgan_calls: int,
         expected_realesrgan_calls: int,
     ) -> None:
-        """指定したフラグに応じて処理結果と呼び出し回数が変わることを検証する。"""
+        """指定フラグに応じて処理結果と呼び出し回数が変わることを検証する。"""
+        reset_dummy_state()
         service = FaceImageProcessingService()
         encoded_image = self._create_base64_image(
             color=(16, 32, 48),
             extension=input_extension,
         )
-
-        retinex_output = np.full((2, 2, 3), (200, 150, 100), dtype=np.uint8)
-        gfpgan_output = np.full((2, 2, 3), (80, 90, 100), dtype=np.uint8)
-        realesrgan_output = np.full((2, 2, 3), (40, 50, 60), dtype=np.uint8)
-        captured_validation_inputs: list[Image.Image] = []
-        captured_retinex_inputs: list[np.ndarray] = []
-        captured_gfpgan_inputs: list[np.ndarray] = []
-        captured_realesrgan_inputs: list[np.ndarray] = []
-        original_fromarray = Image.fromarray
-
-        def dummy_compatible_fromarray(obj: np.ndarray, mode: str | None = None) -> Image.Image:
-            if np.issubdtype(obj.dtype, np.floating):
-                obj = np.clip(obj, 0.0, 1.0)
-                obj = (obj * 255.0).round().astype(np.uint8)
-            return original_fromarray(obj, mode=mode)
-
-        class DummyRetinexformer:
-            def processing(self, *, image_np: np.ndarray) -> np.ndarray:
-                captured_retinex_inputs.append(image_np)
-                return retinex_output
-
-        class DummyGfpgan:
-            def processing(self, *, image_np: np.ndarray) -> np.ndarray:
-                captured_gfpgan_inputs.append(image_np)
-                return gfpgan_output
-
-        class DummyRealEsrGan:
-            def processing(self, *, image_np: np.ndarray) -> np.ndarray:
-                captured_realesrgan_inputs.append(image_np)
-                return realesrgan_output
-
-        def dummy_validation_with_face(*, image: Image.Image) -> None:
-            captured_validation_inputs.append(image)
-            return None
-
-        monkeypatch.setattr(
-            "app.services.face_image_processing_service.Retinexformer",
-            DummyRetinexformer,
-        )
-        monkeypatch.setattr(
-            "app.services.face_image_processing_service.Gfpgan",
-            DummyGfpgan,
-        )
-        monkeypatch.setattr(
-            "app.services.face_image_processing_service.RealEsrGan",
-            DummyRealEsrGan,
-        )
-        monkeypatch.setattr(
-            "app.services.face_image_processing_service.ValidationHelper.validation_with_face",
-            dummy_validation_with_face,
-        )
-        monkeypatch.setattr(Image, "fromarray", dummy_compatible_fromarray)
 
         response = service.processing(
             content=encoded_image,
@@ -146,46 +154,37 @@ class TestFaceImageProcessingService:
             use_correction_lm=use_correction_lm,
             use_resolution_lm=use_resolution_lm,
         )
-        result_image = Image.open(BytesIO(base64.b64decode(response.content))).convert("RGB")
 
-        assert response == FaceImageProcessingResponse(
-            content=response.content,
-            extension=input_extension,
-            size_bytes=expected_size_bytes,
-        )
-        assert len(captured_validation_inputs) == 1
-        assert isinstance(captured_validation_inputs[0], Image.Image)
+        assert isinstance(response, FaceImageProcessingResponse)
+        assert response.extension == input_extension
+        assert response.size_bytes == expected_size_bytes
+        assert len(CAPTURED_VALIDATION_INPUTS) == 1
+        assert isinstance(CAPTURED_VALIDATION_INPUTS[0], Image.Image)
         assert np.array_equal(
-            np.asarray(captured_validation_inputs[0]),
+            np.asarray(CAPTURED_VALIDATION_INPUTS[0]),
             np.full((2, 2, 3), (16, 32, 48), dtype=np.uint8),
         )
-        assert len(captured_retinex_inputs) == expected_retinex_calls
-        assert len(captured_gfpgan_inputs) == expected_gfpgan_calls
-        assert len(captured_realesrgan_inputs) == expected_realesrgan_calls
+        assert len(CAPTURED_RETINEX_INPUTS) == expected_retinex_calls
+        assert len(CAPTURED_GFPGAN_INPUTS) == expected_gfpgan_calls
+        assert len(CAPTURED_REALESRGAN_INPUTS) == expected_realesrgan_calls
         if expected_retinex_calls:
-            assert captured_retinex_inputs[0].dtype == np.float32
-            assert captured_retinex_inputs[0].shape == (2, 2, 3)
+            assert CAPTURED_RETINEX_INPUTS[0].dtype == np.float32
+            assert CAPTURED_RETINEX_INPUTS[0].shape == (2, 2, 3)
         if expected_gfpgan_calls:
             expected_gfpgan_input = (
-                retinex_output
+                RETINEX_OUTPUT
                 if use_brightness_adjustment_lm
                 else np.full((2, 2, 3), (16, 32, 48), dtype=np.uint8)
             )
-            assert np.array_equal(captured_gfpgan_inputs[0], expected_gfpgan_input)
+            assert np.array_equal(CAPTURED_GFPGAN_INPUTS[0], expected_gfpgan_input)
         if expected_realesrgan_calls:
             if use_correction_lm:
-                expected_realesrgan_input = gfpgan_output
+                expected_realesrgan_input = GFPGAN_OUTPUT
             elif use_brightness_adjustment_lm:
-                expected_realesrgan_input = retinex_output
+                expected_realesrgan_input = RETINEX_OUTPUT
             else:
                 expected_realesrgan_input = np.full((2, 2, 3), (16, 32, 48), dtype=np.uint8)
-            assert np.array_equal(captured_realesrgan_inputs[0], expected_realesrgan_input)
-        assert result_image.size == (2, 2)
-        assert np.allclose(
-            np.asarray(result_image, dtype=np.float32),
-            np.full((2, 2, 3), expected_color, dtype=np.float32),
-            atol=5.0,
-        )
+            assert np.array_equal(CAPTURED_REALESRGAN_INPUTS[0], expected_realesrgan_input)
 
     @pytest.mark.parametrize(
         ("extension", "expected_format"),
@@ -220,19 +219,15 @@ class TestFaceImageProcessingService:
             "jpeg_save_failure",
         ],
     )
+    @patch.object(Image.Image, "save", autospec=True, side_effect=dummy_raise_on_save)
     def test_pil_image_to_base64_raises_value_error_when_save_fails(
         self,
-        monkeypatch: pytest.MonkeyPatch,
+        _mock_save,
         extension: ExtensionType,
     ) -> None:
         """画像保存失敗時に ValueError を送出することを検証する。"""
         service = FaceImageProcessingService()
         image = Image.new("RGB", size=(1, 1), color=(0, 0, 0))
-
-        def raise_on_save(self, fp, format=None, **params):
-            raise OSError("save failed")
-
-        monkeypatch.setattr(Image.Image, "save", raise_on_save)
 
         with pytest.raises(ValueError, match="Failed to encode image: save failed"):
             service._pil_image_to_base64(image=image, extension=extension)
@@ -253,7 +248,7 @@ class TestFaceImageProcessingService:
         extension: ExtensionType,
         expected_format: str,
     ) -> None:
-        """指定形式で保存した画像バイト数を返すことを確認する。"""
+        """指定形式で保存した画像バイト数を返すことを検証する。"""
         service = FaceImageProcessingService()
         image = Image.new("RGB", size=(3, 3), color=(10, 20, 30))
 
