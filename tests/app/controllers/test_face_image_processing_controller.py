@@ -1,5 +1,8 @@
 import pytest
+from fastapi import HTTPException
 
+from app.core.exceptions import FaceNotFoundException, MultipleFacesDetectionException
+from app.core.messages import ValidationMessages
 from app.controllers.face_image_processing_controller import FaceImageProcessingController
 from app.models.requests.face_image_processing_request import (
     ExtensionType,
@@ -91,3 +94,56 @@ class TestFaceImageProcessingController:
             "use_correction_lm": use_correction_lm,
             "use_resolution_lm": use_resolution_lm,
         }
+
+    @pytest.mark.parametrize(
+        ("raised_exception", "expected_status_code", "expected_detail"),
+        [
+            (FaceNotFoundException(), 404, ValidationMessages.FACE_NOT_FOUND),
+            (
+                MultipleFacesDetectionException(),
+                409,
+                ValidationMessages.MULTIPLE_FACES_DETECTED,
+            ),
+        ],
+        ids=[
+            "face_not_found_maps_to_404",
+            "multiple_faces_maps_to_409",
+        ],
+    )
+    def test_processing_converts_domain_exceptions_to_http_exception(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        raised_exception: Exception,
+        expected_status_code: int,
+        expected_detail: str,
+    ) -> None:
+        request = FaceImageProcessingRequest(
+            content="encoded-image",
+            extension=ExtensionType.PNG,
+            use_brightness_adjustment_lm=False,
+            use_correction_lm=False,
+            use_resolution_lm=False,
+        )
+
+        class DummyFaceImageProcessingService:
+            def processing(
+                self,
+                *,
+                content: str,
+                extension: ExtensionType,
+                use_brightness_adjustment_lm: bool,
+                use_correction_lm: bool,
+                use_resolution_lm: bool,
+            ) -> FaceImageProcessingResponse:
+                raise raised_exception
+
+        monkeypatch.setattr(
+            "app.controllers.face_image_processing_controller.FaceImageProcessingService",
+            DummyFaceImageProcessingService,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            FaceImageProcessingController().processing(request=request)
+
+        assert exc_info.value.status_code == expected_status_code
+        assert exc_info.value.detail == expected_detail
