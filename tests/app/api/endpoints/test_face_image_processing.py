@@ -7,10 +7,12 @@ import asyncio
 import numpy as np
 from PIL import Image
 import pytest
+from fastapi import HTTPException
 
 from app.apis.endpoints.face_image_processing import (
     face_image_process,
 )
+from app.core.messages import ValidationMessages
 from app.main import app
 from app.models.requests.face_image_processing_request import (
     ExtensionType,
@@ -172,6 +174,53 @@ class TestFaceImageProcessing:
                 "size_bytes": 123,
             },
         }
+
+    @pytest.mark.parametrize(
+        ("raised_exception", "expected_status_code", "expected_detail"),
+        [
+            (HTTPException(status_code=404, detail=ValidationMessages.FACE_NOT_FOUND), 404, ValidationMessages.FACE_NOT_FOUND),
+            (
+                HTTPException(
+                    status_code=409,
+                    detail=ValidationMessages.MULTIPLE_FACES_DETECTED,
+                ),
+                409,
+                ValidationMessages.MULTIPLE_FACES_DETECTED,
+            ),
+        ],
+        ids=[
+            "face_not_found_returns_404",
+            "multiple_faces_returns_409",
+        ],
+    )
+    def test_face_image_process_returns_http_exception_response(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        raised_exception: HTTPException,
+        expected_status_code: int,
+        expected_detail: str,
+    ) -> None:
+        class DummyFaceImageProcessingController:
+            def processing(self, *, request: FaceImageProcessingRequest):
+                raise raised_exception
+
+        monkeypatch.setattr(
+            "app.apis.endpoints.face_image_processing.FaceImageProcessingController",
+            DummyFaceImageProcessingController,
+        )
+
+        status_code, payload = self._post_face_image_process(
+            {
+                "content": "encoded-image",
+                "extension": ExtensionType.PNG.value,
+                "use_brightness_adjustment_lm": False,
+                "use_correction_lm": False,
+                "use_resolution_lm": False,
+            }
+        )
+
+        assert status_code == expected_status_code
+        assert payload == {"detail": expected_detail}
 
     @pytest.mark.parametrize(
         (
