@@ -2,24 +2,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
-import sys
-import types
 
 import numpy as np
 import torch
 from facexlib.detection.retinaface import RetinaFace
 from facexlib.parsing.parsenet import ParseNet
 from facexlib.utils import face_restoration_helper as face_helper_module
-from torchvision.transforms.functional import rgb_to_grayscale
-
-
-def _patch_torchvision_functional_tensor() -> None:
-    if "torchvision.transforms.functional_tensor" in sys.modules:
-        return
-
-    functional_tensor = types.ModuleType("torchvision.transforms.functional_tensor")
-    functional_tensor.rgb_to_grayscale = rgb_to_grayscale
-    sys.modules[functional_tensor.__name__] = functional_tensor
+from app.ml._compat import _patch_torchvision_functional_tensor
 
 
 _patch_torchvision_functional_tensor()
@@ -129,7 +118,6 @@ class Gfpgan:
     def processing(
         self,
         image_np: np.ndarray,
-        *,
         has_aligned: bool = False,
         only_center_face: bool = False,
         paste_back: bool = True,
