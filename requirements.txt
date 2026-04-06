@@ -10,3 +10,4 @@ pillow
 facexlib
 gfpgan
 realesrgan
+scrfd

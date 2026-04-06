@@ -90,12 +90,13 @@ class TestFaceImageProcessingService:
         retinex_output = np.full((2, 2, 3), (200, 150, 100), dtype=np.uint8)
         gfpgan_output = np.full((2, 2, 3), (80, 90, 100), dtype=np.uint8)
         realesrgan_output = np.full((2, 2, 3), (40, 50, 60), dtype=np.uint8)
+        captured_validation_inputs: list[Image.Image] = []
         captured_retinex_inputs: list[np.ndarray] = []
         captured_gfpgan_inputs: list[np.ndarray] = []
         captured_realesrgan_inputs: list[np.ndarray] = []
         original_fromarray = Image.fromarray
 
-        def compatible_fromarray(obj: np.ndarray, mode: str | None = None) -> Image.Image:
+        def dummy_compatible_fromarray(obj: np.ndarray, mode: str | None = None) -> Image.Image:
             if np.issubdtype(obj.dtype, np.floating):
                 obj = np.clip(obj, 0.0, 1.0)
                 obj = (obj * 255.0).round().astype(np.uint8)
@@ -116,6 +117,10 @@ class TestFaceImageProcessingService:
                 captured_realesrgan_inputs.append(image_np)
                 return realesrgan_output
 
+        def dummy_validation_with_face(*, image: Image.Image) -> None:
+            captured_validation_inputs.append(image)
+            return None
+
         monkeypatch.setattr(
             "app.services.face_image_processing_service.Retinexformer",
             DummyRetinexformer,
@@ -128,7 +133,11 @@ class TestFaceImageProcessingService:
             "app.services.face_image_processing_service.RealEsrGan",
             DummyRealEsrGan,
         )
-        monkeypatch.setattr(Image, "fromarray", compatible_fromarray)
+        monkeypatch.setattr(
+            "app.services.face_image_processing_service.ValidationHelper.validation_with_face",
+            dummy_validation_with_face,
+        )
+        monkeypatch.setattr(Image, "fromarray", dummy_compatible_fromarray)
 
         response = service.processing(
             content=encoded_image,
@@ -143,6 +152,12 @@ class TestFaceImageProcessingService:
             content=response.content,
             extension=input_extension,
             size_bytes=expected_size_bytes,
+        )
+        assert len(captured_validation_inputs) == 1
+        assert isinstance(captured_validation_inputs[0], Image.Image)
+        assert np.array_equal(
+            np.asarray(captured_validation_inputs[0]),
+            np.full((2, 2, 3), (16, 32, 48), dtype=np.uint8),
         )
         assert len(captured_retinex_inputs) == expected_retinex_calls
         assert len(captured_gfpgan_inputs) == expected_gfpgan_calls
