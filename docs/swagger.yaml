@@ -1,0 +1,181 @@
+openapi: 3.0.3
+info:
+  title: teraid Face API
+  version: 1.0.0
+  description: 顔画像修正用APIのSwagger定義です。
+servers:
+  - url: http://localhost:8000
+    description: Local
+tags:
+  - name: Face Image Processing
+    description: 顔画像の補正・明るさ調整・解像度調整を行うAPI
+paths:
+  /face-image-process/:
+    post:
+      tags:
+        - Face Image Processing
+      summary: 顔画像を処理する
+      description: |
+        Base64エンコードされた顔画像を受け取り、指定された処理を実行して返却します。
+
+        `use_brightness_adjustment_lm`、`use_correction_lm`、`use_resolution_lm` を
+        段階的に有効化することで、明るさ補正、顔補正、解像度補正を適用できます。
+      operationId: faceImageProcess
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaceImageProcessingRequest'
+            examples:
+              basic:
+                summary: 補正なし
+                value:
+                  content: iVBORw0KGgoAAAANSUhEUgAA...
+                  extension: png
+                  use_brightness_adjustment_lm: false
+                  use_correction_lm: false
+                  use_resolution_lm: false
+              fullProcessing:
+                summary: すべての補正を有効化
+                value:
+                  content: /9j/4AAQSkZJRgABAQAAAQABAAD...
+                  extension: jpeg
+                  use_brightness_adjustment_lm: true
+                  use_correction_lm: true
+                  use_resolution_lm: true
+      responses:
+        '200':
+          description: 正常終了
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaceImageProcessingSuccessResponse'
+              examples:
+                success:
+                  value:
+                    status: success
+                    data:
+                      content: iVBORw0KGgoAAAANSUhEUgAA...
+                      extension: png
+                      size_bytes: 123456
+        '404':
+          description: 顔が検出されなかった
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: 顔画を認識できませんでした。
+        '409':
+          description: 複数の顔が検出された
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: 顔画が複数存在します。
+        '422':
+          description: リクエストのバリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+components:
+  schemas:
+    ExtensionType:
+      type: string
+      description: 画像拡張子
+      enum:
+        - jpeg
+        - png
+    FaceImageProcessingRequest:
+      type: object
+      required:
+        - content
+        - extension
+        - use_brightness_adjustment_lm
+        - use_correction_lm
+        - use_resolution_lm
+      properties:
+        content:
+          type: string
+          description: 加工対象の顔画像をBase64エンコードした文字列
+          example: iVBORw0KGgoAAAANSUhEUgAA...
+        extension:
+          $ref: '#/components/schemas/ExtensionType'
+        use_brightness_adjustment_lm:
+          type: boolean
+          description: 明るさ調整機能の利用有無
+          example: true
+        use_correction_lm:
+          type: boolean
+          description: 顔補正機能の利用有無
+          example: true
+        use_resolution_lm:
+          type: boolean
+          description: 解像度補正機能の利用有無
+          example: false
+    FaceImageProcessingResponse:
+      type: object
+      required:
+        - content
+        - extension
+        - size_bytes
+      properties:
+        content:
+          type: string
+          description: 加工後の顔画像をBase64エンコードした文字列
+          example: iVBORw0KGgoAAAANSUhEUgAA...
+        extension:
+          $ref: '#/components/schemas/ExtensionType'
+        size_bytes:
+          type: integer
+          format: int64
+          description: 画像サイズ(bytes)
+          example: 123456
+    FaceImageProcessingSuccessResponse:
+      type: object
+      required:
+        - status
+        - data
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          $ref: '#/components/schemas/FaceImageProcessingResponse'
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          example: error message
+    ValidationErrorItem:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+    ValidationErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationErrorItem'
