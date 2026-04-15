@@ -10,8 +10,8 @@ from app.ml.retinexformer import Retinexformer
 from app.ml.models.retinexformer import MST_Plus_Plus
 
 
-TEST_IMAGE_PATH = Path("tests/app/test_data/test_image/retinexformer/test_face.png")
-RESULT_IMAGE_PATH = Path("tests/app/test_data/test_image/retinexformer/result_face.png")
+TEST_IMAGE_PATH = Path("tests/test_data/test_image/retinexformer/test_face.png")
+RESULT_IMAGE_PATH = Path("tests/test_data/test_image/retinexformer/result_face.png")
 
 
 class TestRetinexformer:

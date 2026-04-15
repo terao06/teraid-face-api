@@ -10,8 +10,8 @@ from app.ml import gfpgan as gfpgan_module
 from app.ml.gfpgan import Gfpgan
 
 
-TEST_IMAGE_PATH = Path("tests/app/test_data/test_image/gfpgan/test_face.png")
-RESULT_IMAGE_PATH = Path("tests/app/test_data/test_image/gfpgan/result_face.png")
+TEST_IMAGE_PATH = Path("tests/test_data/test_image/gfpgan/test_face.png")
+RESULT_IMAGE_PATH = Path("tests/test_data/test_image/gfpgan/result_face.png")
 
 
 class TestGfpgan:

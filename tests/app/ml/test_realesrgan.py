@@ -10,8 +10,8 @@ from app.ml import realesrgan as realesrgan_module
 from app.ml.realesrgan import RealEsrGan
 
 
-TEST_IMAGE_PATH = Path("tests/app/test_data/test_image/realesrgan/test_face.png")
-RESULT_IMAGE_PATH = Path("tests/app/test_data/test_image/realesrgan/result_face.png")
+TEST_IMAGE_PATH = Path("tests/test_data/test_image/realesrgan/test_face.png")
+RESULT_IMAGE_PATH = Path("tests/test_data/test_image/realesrgan/result_face.png")
 
 
 class TestRealEsrGan:

@@ -24,15 +24,15 @@ from app.models.responses.face_image_processing_response import (
 
 
 class TestFaceImageProcessing:
-    TEST_FACE_IMAGE_PATH = Path("tests/app/test_data/test_image/retinexformer/test_face.png")
+    TEST_FACE_IMAGE_PATH = Path("tests/test_data/test_image/retinexformer/test_face.png")
     RETINEXFORMER_RESULT_IMAGE_PATH = Path(
-        "tests/app/test_data/test_image/retinexformer/result_face.png"
+        "tests/test_data/test_image/retinexformer/result_face.png"
     )
     GFPGAN_RESULT_IMAGE_PATH = Path(
-        "tests/app/test_data/test_image/gfpgan/result_face.png"
+        "tests/test_data/test_image/gfpgan/result_face.png"
     )
     REALESRGAN_RESULT_IMAGE_PATH = Path(
-        "tests/app/test_data/test_image/realesrgan/result_face.png"
+        "tests/test_data/test_image/realesrgan/result_face.png"
     )
 
     def _encode_image(self, image: Image.Image, extension: ExtensionType) -> str:
