@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from app.ml.retinexformer import Retinexformer
-from app.vendor.retinexformer.basicsr.models.archs.MST_Plus_Plus_arch import MST_Plus_Plus
+from app.ml.models.retinexformer import MST_Plus_Plus
 
 
 TEST_IMAGE_PATH = Path("tests/app/test_data/test_image/retinexformer/test_face.png")
