@@ -8,7 +8,7 @@ from PIL import Image
 import torch
 import torch.nn.functional as F
 
-from app.vendor.retinexformer.basicsr.models.archs.MST_Plus_Plus_arch import MST_Plus_Plus
+from app.ml.models.retinexformer import MST_Plus_Plus
 
 
 ML_ROOT = Path(__file__).resolve().parent

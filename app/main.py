@@ -18,8 +18,10 @@ app = FastAPI(
 
 origins = [
     "http://localhost:3000", # 例えばローカル開発
+    "http://localhost:3001",
     # 他の必要なオリジンもここに追加
 ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,        # 許可するオリジンのリスト

@@ -4,7 +4,8 @@ import torch.nn.functional as F
 from einops import rearrange
 import math
 import warnings
-from torch.nn.init import _calculate_fan_in_and_fan_out
+from fvcore.nn import FlopCountAnalysis
+
 
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):
     def norm_cdf(x):
@@ -26,10 +27,8 @@ def _no_grad_trunc_normal_(tensor, mean, std, a, b):
 
 
 def trunc_normal_(tensor, mean=0., std=1., a=-2., b=2.):
-    # type: (Tensor, float, float, float, float) -> Tensor
+    # type: (Tensor, float, float, float, float) -> Tensor # pyright: ignore[reportUndefinedVariable]
     return _no_grad_trunc_normal_(tensor, mean, std, a, b)
-
-
 
 
 class PreNorm(nn.Module):
@@ -116,6 +115,7 @@ class MS_MSA(nn.Module):
 
         return out
 
+
 class FeedForward(nn.Module):
     def __init__(self, dim, mult=4):
         super().__init__()
@@ -134,6 +134,7 @@ class FeedForward(nn.Module):
         """
         out = self.net(x.permute(0, 3, 1, 2))
         return out.permute(0, 2, 3, 1)
+
 
 class MSAB(nn.Module):
     def __init__(
@@ -162,6 +163,7 @@ class MSAB(nn.Module):
             x = ff(x) + x
         out = x.permute(0, 3, 1, 2)
         return out
+
 
 class MST(nn.Module):
     def __init__(self, in_dim=30, out_dim=30, dim=30, stage=2, num_blocks=[2,4,4]):
@@ -245,6 +247,7 @@ class MST(nn.Module):
 
         return out
 
+
 class MST_Plus_Plus(nn.Module):
     def __init__(self, in_channels=3, out_channels=3, n_feat=30, stage=1):
         super(MST_Plus_Plus, self).__init__()
@@ -269,24 +272,3 @@ class MST_Plus_Plus(nn.Module):
         h += x
         h = self.conv_out(h)
         return h[:, :, :h_inp, :w_inp]
-
-
-
-if __name__ == '__main__':
-    from fvcore.nn import FlopCountAnalysis
-    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-    model = MST_Plus_Plus().to(device)
-    inputs = torch.randn((1, 3, 256, 256)).to(device)
-    flops = FlopCountAnalysis(model,inputs)
-    n_param = sum([p.nelement() for p in model.parameters()])  # 所有参数数量
-    print(f'GMac:{flops.total()/(1024*1024*1024)}')
-    print(f'Params:{n_param}')
-
-
-
-
-
-
-
-
-
