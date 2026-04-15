@@ -6,7 +6,7 @@ import pytest
 from app.ml.scrfd import ML_ROOT, Scrfd
 
 
-TEST_IMAGE_DIR = Path("tests/app/test_data/test_image/scrfd")
+TEST_IMAGE_DIR = Path("tests/test_data/test_image/scrfd")
 
 
 class TestScrfd:
