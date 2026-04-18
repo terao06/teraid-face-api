@@ -6,10 +6,10 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn.functional as F
-from app.ml._compat import _patch_torchvision_functional_tensor
+from app.ml._compat import patch_torchvision_functional_tensor
 
 
-_patch_torchvision_functional_tensor()
+patch_torchvision_functional_tensor()
 
 from app.ml.models.realesrgan import load_realesrgan_model
 

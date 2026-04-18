@@ -4,7 +4,7 @@ import types
 from torchvision.transforms.functional import rgb_to_grayscale
 
 
-def _patch_torchvision_functional_tensor() -> None:
+def patch_torchvision_functional_tensor() -> None:
     """
     古い依存ライブラリ向けに ``torchvision.transforms.functional_tensor`` を補う。
 

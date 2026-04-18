@@ -585,7 +585,6 @@ class GFPGANv1Clean(nn.Module):
 def load_gfpgan_model(
     weight_bytes: BytesIO,
     device: torch.device | str,
-    *,
     channel_multiplier: int = 2,
 ) -> GFPGANv1Clean:
     runtime_device = torch.device(device)
