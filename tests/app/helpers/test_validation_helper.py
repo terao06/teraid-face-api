@@ -19,7 +19,10 @@ class TestValidationHelper:
     ) -> None:
         image = Image.new("RGB", (8, 8))
 
-        result = ValidationHelper.validation_with_face(image=image)
+        result = ValidationHelper.validation_with_face(
+            image=image,
+            scrfd_weight_bytes=b"dummy-scrfd-weight",
+        )
 
         assert result is None
         mock_warning.assert_not_called()
@@ -36,7 +39,10 @@ class TestValidationHelper:
         image = Image.new("RGB", (8, 8))
 
         with pytest.raises(MultipleFacesDetectionException):
-            ValidationHelper.validation_with_face(image=image)
+            ValidationHelper.validation_with_face(
+                image=image,
+                scrfd_weight_bytes=b"dummy-scrfd-weight",
+            )
 
         mock_warning.assert_called_once()
         _mock_get_face_counts.assert_called_once()
@@ -52,7 +58,10 @@ class TestValidationHelper:
         image = Image.new("RGB", (8, 8))
 
         with pytest.raises(FaceNotFoundException):
-            ValidationHelper.validation_with_face(image=image)
+            ValidationHelper.validation_with_face(
+                image=image,
+                scrfd_weight_bytes=b"dummy-scrfd-weight",
+            )
 
         mock_warning.assert_called_once()
         _mock_get_face_counts.assert_called_once()

@@ -5,12 +5,14 @@ import io
 import numpy as np
 from PIL import Image
 
-from app.ml.retinexformer import Retinexformer
-from app.ml.gfpgan import Gfpgan
-from app.ml.realesrgan import RealEsrGan
 from app.models.requests.face_image_processing_request import ExtensionType
 from app.models.responses.face_image_processing_response import FaceImageProcessingResponse
 from app.helpers.validation_helper import ValidationHelper
+from app.ml.retinexformer import Retinexformer
+from app.ml.gfpgan import Gfpgan
+from app.ml.realesrgan import RealEsrGan
+from app.core.aws.ssm_client import SsmClient
+from app.core.aws.s3_client import S3Client
 
 
 class FaceImageProcessingService:
@@ -21,29 +23,61 @@ class FaceImageProcessingService:
             use_brightness_adjustment_lm: bool,
             use_correction_lm: bool,
             use_resolution_lm: bool,
-            ) -> FaceImageProcessingResponse:
+        ) -> FaceImageProcessingResponse:
 
         image_bytes = base64.b64decode(content)
         target_image = Image.open(BytesIO(image_bytes)).convert("RGB")
+        ssm_params = SsmClient()
+        s3_client = S3Client(s3_endpoint=ssm_params.s3_endpoint)
+        scrfd_weight_bytes = s3_client.get_object(
+            bucket_name=ssm_params.llm_weight_bucket,
+            key=ssm_params.scrfd_weight
+        )
 
         # バリデーション実施
-        ValidationHelper.validation_with_face(image=target_image)
+        ValidationHelper.validation_with_face(image=target_image, scrfd_weight_bytes=scrfd_weight_bytes)
 
         target_image_np = np.asarray(target_image)
         processing_image_np = target_image_np.copy()
 
-
         normalized_image_np = target_image_np.astype(np.float32) / 255.0
         if use_brightness_adjustment_lm:
-            retinexformer = Retinexformer()
+            retinex_weight_bytes = s3_client.get_object(
+                bucket_name=ssm_params.llm_weight_bucket,
+                key=ssm_params.retinexformer_weight
+            )
+
+            retinexformer = Retinexformer(weight_bytes=BytesIO(retinex_weight_bytes))
             processing_image_np = retinexformer.processing(image_np=normalized_image_np)
 
         if use_correction_lm:
-            gfpgan = Gfpgan()
+            gfp_weight_bytes = s3_client.get_object(
+                bucket_name=ssm_params.llm_weight_bucket,
+                key=ssm_params.gfpgan_nv_weight
+            )
+            resnet_weight_bytes = s3_client.get_object(
+                bucket_name=ssm_params.llm_weight_bucket,
+                key=ssm_params.gfpgan_resnet_weight
+            )
+            parsing_wight_bytes = s3_client.get_object(
+                bucket_name=ssm_params.llm_weight_bucket,
+                key=ssm_params.gfpgan_parsenet_weight
+            )
+
+            gfpgan = Gfpgan(
+                weight_bytes=BytesIO(gfp_weight_bytes),
+                resnet_weight_bytes=BytesIO(resnet_weight_bytes),
+                parsing_wight_bytes=BytesIO(parsing_wight_bytes)
+            )
+
             processing_image_np = gfpgan.processing(image_np=processing_image_np)
 
         if use_resolution_lm:
-            realesrgan = RealEsrGan()
+            parsing_wight_bytes = s3_client.get_object(
+                bucket_name=ssm_params.llm_weight_bucket,
+                key=ssm_params.realesrgan_weight
+            )
+            realesrgan = RealEsrGan(weight_bytes=BytesIO(parsing_wight_bytes))
             processing_image_np = realesrgan.processing(image_np=processing_image_np)
 
         processing_image = Image.fromarray(processing_image_np)

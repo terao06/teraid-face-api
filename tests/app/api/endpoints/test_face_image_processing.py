@@ -24,15 +24,15 @@ from app.models.responses.face_image_processing_response import (
 
 
 class TestFaceImageProcessing:
-    TEST_FACE_IMAGE_PATH = Path("tests/app/test_data/test_image/retinexformer/test_face.png")
+    TEST_FACE_IMAGE_PATH = Path("tests/test_data/images/retinexformer/test_face.png")
     RETINEXFORMER_RESULT_IMAGE_PATH = Path(
-        "tests/app/test_data/test_image/retinexformer/result_face.png"
+        "tests/test_data/images/retinexformer/result_face.png"
     )
     GFPGAN_RESULT_IMAGE_PATH = Path(
-        "tests/app/test_data/test_image/gfpgan/result_face.png"
+        "tests/test_data/images/gfpgan/result_face.png"
     )
     REALESRGAN_RESULT_IMAGE_PATH = Path(
-        "tests/app/test_data/test_image/realesrgan/result_face.png"
+        "tests/test_data/images/realesrgan/result_face.png"
     )
 
     def _encode_image(self, image: Image.Image, extension: ExtensionType) -> str:
@@ -193,8 +193,10 @@ class TestFaceImageProcessing:
             (True, True, True, 200, TEST_FACE_IMAGE_PATH, REALESRGAN_RESULT_IMAGE_PATH),
         ],
     )
+    @pytest.mark.usefixtures("initialize_s3")
     def test_face_image_process_with_real_image(
         self,
+        mock_ssm: MagicMock,
         use_brightness_adjustment_lm: bool,
         use_correction_lm: bool,
         use_resolution_lm: bool,
@@ -217,6 +219,7 @@ class TestFaceImageProcessing:
             }
         )
 
+        mock_ssm.assert_called_once_with()
         assert status_code == expected_status_code
         assert expected_image_path is not None
         expected_image = self._load_image(expected_image_path)

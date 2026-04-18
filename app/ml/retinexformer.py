@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 import yaml
 
@@ -8,15 +9,15 @@ from PIL import Image
 import torch
 import torch.nn.functional as F
 
-from app.vendor.retinexformer.basicsr.models.archs.MST_Plus_Plus_arch import MST_Plus_Plus
+from app.ml.models.retinexformer import MST_Plus_Plus
 
 
 ML_ROOT = Path(__file__).resolve().parent
 
 
 class Retinexformer:
-    def __init__(self) -> None:
-        self.weight_path = ML_ROOT / "weights" / "retinexformer" / "MST_Plus_Plus_8x1150.pth"
+    def __init__(self, weight_bytes: BytesIO) -> None:
+        self.weight_bytes = weight_bytes
         self.opt_path = ML_ROOT / "configs" / "retinexformer" / "MST_Plus_Plus_NTIRE_8x1150.yml"
         self.device = torch.device("cuda")
 
@@ -42,10 +43,7 @@ class Retinexformer:
             raise ValueError(f"Unexpected network type: {network_type}")
 
         model = MST_Plus_Plus(
-            in_channels=network_g["in_channels"],
-            out_channels=network_g["out_channels"],
-            n_feat=network_g["n_feat"],
-            stage=network_g["stage"],
+            **{key: value for key, value in network_g.items() if key != "type"},
         )
         return model
 
@@ -53,7 +51,8 @@ class Retinexformer:
         opt = self._load_yaml_opt()
         model = self._build_network_from_yaml(opt=opt)
 
-        checkpoint = torch.load(self.weight_path, map_location=self.device, weights_only=True)
+        self.weight_bytes.seek(0)
+        checkpoint = torch.load(self.weight_bytes, map_location=self.device, weights_only=True)
 
         if "params_ema" in checkpoint:
             state_dict = checkpoint["params_ema"]

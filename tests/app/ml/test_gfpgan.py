@@ -1,3 +1,4 @@
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -10,13 +11,32 @@ from app.ml import gfpgan as gfpgan_module
 from app.ml.gfpgan import Gfpgan
 
 
-TEST_IMAGE_PATH = Path("tests/app/test_data/test_image/gfpgan/test_face.png")
-RESULT_IMAGE_PATH = Path("tests/app/test_data/test_image/gfpgan/result_face.png")
+TEST_IMAGE_PATH = Path("tests/test_data/images/gfpgan/test_face.png")
+RESULT_IMAGE_PATH = Path("tests/test_data/images/gfpgan/result_face.png")
+WEIGHTS_DIR = Path("tests/test_data/s3/buckets/weights/gfpgan")
+GFPGAN_WEIGHT_PATH = WEIGHTS_DIR / "GFPGANv.pth"
+RESNET_WEIGHT_PATH = WEIGHTS_DIR / "detection_Resnet50_Final.pth"
+PARSENET_WEIGHT_PATH = WEIGHTS_DIR / "parsing_parsenet.pth"
 
 
 class TestGfpgan:
+    @staticmethod
+    def _dummy_weight_bytes() -> BytesIO:
+        return BytesIO(b"dummy-weight-bytes")
+
+    def _build_gfpgan(self) -> Gfpgan:
+        return Gfpgan(
+            weight_bytes=self._dummy_weight_bytes(),
+            resnet_weight_bytes=self._dummy_weight_bytes(),
+            parsing_wight_bytes=self._dummy_weight_bytes(),
+        )
+
+    @staticmethod
+    def _load_weight_bytes(path: Path) -> BytesIO:
+        return BytesIO(path.read_bytes())
+
     def test_patch_facexlib_initializers_replaces_helpers(self) -> None:
-        gfpgan = Gfpgan()
+        gfpgan = self._build_gfpgan()
         original_detection = object()
         original_parsing = object()
 
@@ -45,7 +65,7 @@ class TestGfpgan:
         mock_retina_face: MagicMock,
         mock_torch_load: MagicMock,
     ) -> None:
-        gfpgan = Gfpgan()
+        gfpgan = self._build_gfpgan()
         captured = {}
 
         class DummyRetinaFace:
@@ -103,7 +123,7 @@ class TestGfpgan:
     def test_custom_initializers_reject_invalid_args(
         self, call_initializer, match: str
     ) -> None:
-        gfpgan = Gfpgan()
+        gfpgan = self._build_gfpgan()
         gfpgan._patch_facexlib_initializers()
 
         with pytest.raises(NotImplementedError, match=match):
@@ -123,16 +143,45 @@ class TestGfpgan:
         restored_img: np.ndarray | None,
         match: str,
     ) -> None:
-        gfpgan = Gfpgan()
+        gfpgan = self._build_gfpgan()
+        image_np = np.zeros((1, 1, 3), dtype=np.uint8)
+
+        class DummyFaceHelper:
+            def __init__(self) -> None:
+                self.cropped_faces = [image_np]
+                self.restored_faces = restored_faces
+
+            def clean_all(self) -> None:
+                return None
+
+            def read_image(self, image) -> None:
+                assert image is image_np
+
+            def get_face_landmarks_5(self, **kwargs) -> None:
+                return None
+
+            def align_warp_face(self) -> None:
+                return None
+
+            def add_restored_face(self, face) -> None:
+                return None
+
+            def get_inverse_affine(self, matrix) -> None:
+                return None
+
+            def paste_faces_to_input_image(self, upsample_img=None):
+                return restored_img
 
         class DummyModel:
-            def enhance(self, image, **kwargs):
-                return None, restored_faces, restored_img
+            def __call__(self, image, return_rgb=False):
+                raise RuntimeError("mock inference failure")
+
+        gfpgan._build_face_helper = lambda: DummyFaceHelper()
 
         with pytest.raises(RuntimeError, match=match):
             gfpgan._enhance_image(
                 model=DummyModel(),
-                image_np=np.zeros((1, 1, 3), dtype=np.uint8),
+                image_np=image_np,
                 paste_back=paste_back,
             )
 
@@ -160,31 +209,63 @@ class TestGfpgan:
         restored_img: np.ndarray | None,
         expected: np.ndarray,
     ) -> None:
-        gfpgan = Gfpgan()
+        gfpgan = self._build_gfpgan()
         image_np = np.zeros(expected.shape, dtype=np.uint8)
         captured = {}
 
+        class DummyFaceHelper:
+            def __init__(self) -> None:
+                self.cropped_faces = [image_np]
+                self.restored_faces = restored_faces
+
+            def clean_all(self) -> None:
+                return None
+
+            def read_image(self, image) -> None:
+                assert image is image_np
+
+            def get_face_landmarks_5(self, **kwargs) -> None:
+                captured["landmarks_kwargs"] = kwargs
+
+            def align_warp_face(self) -> None:
+                return None
+
+            def add_restored_face(self, face) -> None:
+                self.restored_faces.append(face)
+
+            def get_inverse_affine(self, matrix) -> None:
+                captured["inverse_affine"] = matrix
+
+            def paste_faces_to_input_image(self, upsample_img=None):
+                captured["upsample_img"] = upsample_img
+                return restored_img
+
         class DummyModel:
-            def enhance(self, image, **kwargs):
-                captured["image"] = image
-                captured["kwargs"] = kwargs
-                return None, restored_faces, restored_img
+            def __call__(self, image, return_rgb=False):
+                captured["image_shape"] = tuple(image.shape)
+                captured["return_rgb"] = return_rgb
+                output = torch.full_like(image, -0.94509804)
+                return (output,)
+
+        gfpgan._build_face_helper = lambda: DummyFaceHelper()
 
         output = gfpgan._enhance_image(
             model=DummyModel(),
             image_np=image_np,
-            has_aligned=True,
             only_center_face=True,
             paste_back=paste_back,
         )
 
         assert np.array_equal(output, expected)
-        assert captured["image"] is image_np
-        assert captured["kwargs"] == {
-            "has_aligned": True,
+        assert captured["image_shape"] == (1, 3, *expected.shape[:2])
+        assert captured["return_rgb"] is False
+        assert captured["landmarks_kwargs"] == {
             "only_center_face": True,
-            "paste_back": paste_back,
+            "eye_dist_threshold": 5,
         }
+        if paste_back:
+            assert captured["inverse_affine"] is None
+            assert captured["upsample_img"] is None
 
     @patch.object(torch, "load")
     @patch.object(gfpgan_module, "ParseNet")
@@ -193,7 +274,7 @@ class TestGfpgan:
         mock_parse_net: MagicMock,
         mock_torch_load: MagicMock,
     ) -> None:
-        gfpgan = Gfpgan()
+        gfpgan = self._build_gfpgan()
         captured = {}
 
         class DummyParseNet:
@@ -230,28 +311,25 @@ class TestGfpgan:
         assert list(captured["state_dict"].keys()) == ["weight"]
         assert torch.equal(captured["state_dict"]["weight"], torch.tensor([2.0]))
 
-    @patch.object(gfpgan_module, "GFPGANer")
+    @patch.object(gfpgan_module, "load_gfpgan_model")
     @patch.object(Gfpgan, "_patch_facexlib_initializers")
     def test_load_model_builds_gfpganer_with_expected_args(
         self,
         mock_patch_facexlib_initializers: MagicMock,
-        mock_gfpganer: MagicMock,
+        mock_load_gfpgan_model: MagicMock,
     ) -> None:
-        gfpgan = Gfpgan()
-        gfpganer_instance = object()
-        mock_gfpganer.return_value = gfpganer_instance
+        gfpgan = self._build_gfpgan()
+        model_instance = object()
+        mock_load_gfpgan_model.return_value = model_instance
 
         model = gfpgan._load_model()
 
-        assert model is gfpganer_instance
+        assert model is model_instance
         mock_patch_facexlib_initializers.assert_called_once_with()
-        mock_gfpganer.assert_called_once_with(
-            model_path=str(gfpgan.weight_path),
-            upscale=gfpgan.upscale,
-            arch=gfpgan.arch,
-            channel_multiplier=gfpgan.channel_multiplier,
-            bg_upsampler=None,
+        mock_load_gfpgan_model.assert_called_once_with(
+            weight_bytes=gfpgan.weight_bytes,
             device=gfpgan.device,
+            channel_multiplier=gfpgan.channel_multiplier,
         )
 
     @patch.object(Gfpgan, "_enhance_image")
@@ -261,7 +339,7 @@ class TestGfpgan:
         mock_load_model: MagicMock,
         mock_enhance_image: MagicMock,
     ) -> None:
-        gfpgan = Gfpgan()
+        gfpgan = self._build_gfpgan()
         image_np = np.arange(12, dtype=np.uint8).reshape(2, 2, 3)
         expected_bgr = np.array(
             [
@@ -273,11 +351,10 @@ class TestGfpgan:
         dummy_model = object()
         mock_load_model.return_value = dummy_model
 
-        def fake_enhance_image(*, model, image_np, **kwargs):
+        def fake_enhance_image(model, image_np, **kwargs):
             assert model is dummy_model
             assert np.array_equal(image_np, np.arange(12, dtype=np.uint8).reshape(2, 2, 3)[:, :, ::-1])
             assert kwargs == {
-                "has_aligned": True,
                 "only_center_face": False,
                 "paste_back": True,
             }
@@ -287,18 +364,52 @@ class TestGfpgan:
 
         output = gfpgan.processing(
             image_np=image_np,
-            has_aligned=True,
             only_center_face=False,
             paste_back=True,
         )
 
         assert np.array_equal(output, expected_bgr[:, :, ::-1])
 
+    @patch.object(Gfpgan, "_enhance_image")
+    @patch.object(Gfpgan, "_load_model")
+    def test_processing_uses_default_flags(
+        self,
+        mock_load_model: MagicMock,
+        mock_enhance_image: MagicMock,
+    ) -> None:
+        gfpgan = self._build_gfpgan()
+        image_np = np.asarray(Image.open(TEST_IMAGE_PATH).convert("RGB"))
+        expected_bgr = np.asarray(Image.open(RESULT_IMAGE_PATH).convert("RGB"))[:, :, ::-1]
+        dummy_model = object()
+        mock_load_model.return_value = dummy_model
+
+        def fake_enhance_image(model, image_np, **kwargs):
+            assert model is dummy_model
+            assert kwargs == {
+                "only_center_face": False,
+                "paste_back": True,
+            }
+            return expected_bgr
+
+        mock_enhance_image.side_effect = fake_enhance_image
+
+        output = gfpgan.processing(image_np=image_np)
+
+        assert isinstance(output, np.ndarray)
+        assert output.shape == image_np.shape
+        assert output.dtype == np.uint8
+        assert np.array_equal(output, expected_bgr[:, :, ::-1])
+    
     def test_processing(self) -> None:
         test_image_np = np.asarray(Image.open(TEST_IMAGE_PATH).convert("RGB"))
         expected = np.asarray(Image.open(RESULT_IMAGE_PATH).convert("RGB"))
 
-        image_np = Gfpgan().processing(image_np=test_image_np)
+        gfpgan = Gfpgan(
+            weight_bytes=self._load_weight_bytes(GFPGAN_WEIGHT_PATH),
+            resnet_weight_bytes=self._load_weight_bytes(RESNET_WEIGHT_PATH),
+            parsing_wight_bytes=self._load_weight_bytes(PARSENET_WEIGHT_PATH),
+        )
+        image_np = gfpgan.processing(image_np=test_image_np)
         diff = np.abs(image_np.astype(np.int16) - expected.astype(np.int16))
 
         assert isinstance(image_np, np.ndarray)
