@@ -17,10 +17,73 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
+      - AWS_REGION=ap-northeast-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy123
+      - SSM_ENDPOINT=http://localstack:4566
+    depends_on:
+      teraid-face-api-s3:
+        condition: service_started
+      teraid-face-api-ssm-init:
+        condition: service_completed_successfully
     gpus: all
     networks:
       - teraid-face-api-network
     restart: unless-stopped
+  
+  teraid-face-api-s3:
+    image: minio/minio
+    container_name: teraid-face-api-s3
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - ./local_data/minio:/data
+    environment:
+      - MINIO_ROOT_USER=dummy
+      - MINIO_ROOT_PASSWORD=dummy123
+    command: server /data --console-address ":9001"
+    networks:
+      - teraid-face-api-network
+    restart: always
+  
+  localstack:
+    image: localstack/localstack:latest
+    container_name: teraid-face-api-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=ssm
+      - DEFAULT_REGION=ap-northeast-1
+      - LOG_LEVEL=WARNING
+      - LS_LOG=warning
+    volumes:
+      - ./local_data/localstack:/var/lib/localstack
+    networks:
+      - teraid-face-api-network
+
+  teraid-face-api-ssm-init:
+    image: teraid-face-api:local
+    container_name: teraid-face-api-ssm-init
+    command: >
+      sh -c "
+        until nc -z localstack 4566; do sleep 1; done;
+        python tests/test_data/ssm/build_ssm.py
+      "
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      - AWS_REGION=ap-northeast-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy123
+      - SSM_ENDPOINT=http://localstack:4566
+    depends_on:
+      - localstack
+    restart: "no"
+    networks:
+      - teraid-face-api-network
 
 networks:
   teraid-face-api-network:

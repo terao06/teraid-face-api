@@ -11,3 +11,5 @@ facexlib
 gfpgan
 realesrgan
 scrfd
+fvcore
+boto3
