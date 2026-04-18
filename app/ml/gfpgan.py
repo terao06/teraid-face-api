@@ -5,9 +5,9 @@ from io import BytesIO
 from pathlib import Path
 
 import numpy as np
-from app.ml._compat import _patch_torchvision_functional_tensor
+from app.ml._compat import patch_torchvision_functional_tensor
 
-_patch_torchvision_functional_tensor()
+patch_torchvision_functional_tensor()
 
 from basicsr.utils import img2tensor, tensor2img
 from facexlib.utils.face_restoration_helper import FaceRestoreHelper

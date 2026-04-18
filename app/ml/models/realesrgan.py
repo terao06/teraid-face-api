@@ -102,7 +102,6 @@ class RRDBNet(nn.Module):
 
 
 def load_realesrgan_model(
-    *,
     weight_bytes: BytesIO,
     device: torch.device,
     scale: int,
