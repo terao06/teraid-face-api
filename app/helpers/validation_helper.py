@@ -1,3 +1,5 @@
+from io import BytesIO
+
 from PIL import Image
 
 from app.core.exceptions import FaceNotFoundException, MultipleFacesDetectionException
@@ -7,8 +9,8 @@ from app.ml.scrfd import Scrfd
 
 class ValidationHelper:
     @classmethod
-    def validation_with_face(cls, image: Image.Image) -> None:
-        face_counts = Scrfd().get_face_counts(image=image)
+    def validation_with_face(cls, image: Image.Image, scrfd_weight_bytes: bytes) -> None:
+        face_counts = Scrfd(weight_bytes=BytesIO(scrfd_weight_bytes)).get_face_counts(image=image)
 
         if face_counts > 1:
             TeraidFaceApiLog.warning(

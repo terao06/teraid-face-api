@@ -16,6 +16,7 @@ from app.services.face_image_processing_service import FaceImageProcessingServic
 
 
 CAPTURED_VALIDATION_INPUTS: list[Image.Image] = []
+CAPTURED_SCRFD_WEIGHT_INPUTS: list[bytes] = []
 CAPTURED_RETINEX_INPUTS: list[np.ndarray] = []
 CAPTURED_GFPGAN_INPUTS: list[np.ndarray] = []
 CAPTURED_REALESRGAN_INPUTS: list[np.ndarray] = []
@@ -27,6 +28,7 @@ ORIGINAL_FROMARRAY = Image.fromarray
 
 def reset_dummy_state() -> None:
     CAPTURED_VALIDATION_INPUTS.clear()
+    CAPTURED_SCRFD_WEIGHT_INPUTS.clear()
     CAPTURED_RETINEX_INPUTS.clear()
     CAPTURED_GFPGAN_INPUTS.clear()
     CAPTURED_REALESRGAN_INPUTS.clear()
@@ -39,8 +41,9 @@ def dummy_compatible_fromarray(obj: np.ndarray, mode: str | None = None) -> Imag
     return ORIGINAL_FROMARRAY(obj, mode=mode)
 
 
-def dummy_validation_with_face(*, image: Image.Image) -> None:
+def dummy_validation_with_face(*, image: Image.Image, scrfd_weight_bytes: bytes) -> None:
     CAPTURED_VALIDATION_INPUTS.append(image)
+    CAPTURED_SCRFD_WEIGHT_INPUTS.append(scrfd_weight_bytes)
 
 
 def dummy_retinexformer_processing(*, image_np: np.ndarray) -> np.ndarray:
@@ -60,6 +63,19 @@ def dummy_realesrgan_processing(*, image_np: np.ndarray) -> np.ndarray:
 
 def dummy_raise_on_save(self, fp, format=None, **params):
     raise OSError("save failed")
+
+
+def dummy_get_object(*, bucket_name: str, key: str) -> bytes:
+    assert bucket_name == "weights"
+    assert key in {
+        "scrfd/scrfd.onnx",
+        "retinexformer/MST_Plus_Plus_8x1150.pth",
+        "gfpgan/GFPGANv.pth",
+        "gfpgan/detection_Resnet50_Final.pth",
+        "gfpgan/parsing_parsenet.pth",
+        "realesrgan/RealESRGAN_x2plus.pth",
+    }
+    return b"dummy-weight-bytes"
 
 
 class TestFaceImageProcessingService:
@@ -118,6 +134,7 @@ class TestFaceImageProcessingService:
             "jpeg_all_lm",
         ],
     )
+    @patch("app.services.face_image_processing_service.S3Client.get_object", side_effect=dummy_get_object)
     @patch.object(Image, "fromarray", side_effect=dummy_compatible_fromarray)
     @patch.object(ValidationHelper, "validation_with_face", side_effect=dummy_validation_with_face)
     @patch.object(RealEsrGan, "processing", side_effect=dummy_realesrgan_processing)
@@ -130,6 +147,8 @@ class TestFaceImageProcessingService:
         _mock_realesrgan_processing: MagicMock,
         _mock_validation_with_face: MagicMock,
         _mock_fromarray: MagicMock,
+        mock_s3_get_object: MagicMock,
+        mock_ssm: MagicMock,
         use_brightness_adjustment_lm: bool,
         use_correction_lm: bool,
         use_resolution_lm: bool,
@@ -159,6 +178,7 @@ class TestFaceImageProcessingService:
         assert response.extension == input_extension
         assert response.size_bytes == expected_size_bytes
         assert len(CAPTURED_VALIDATION_INPUTS) == 1
+        assert CAPTURED_SCRFD_WEIGHT_INPUTS == [b"dummy-weight-bytes"]
         assert isinstance(CAPTURED_VALIDATION_INPUTS[0], Image.Image)
         assert np.array_equal(
             np.asarray(CAPTURED_VALIDATION_INPUTS[0]),
@@ -188,8 +208,22 @@ class TestFaceImageProcessingService:
     
         if use_brightness_adjustment_lm:
             _mock_retinexformer_processing.assert_called_once()
+            mock_ssm.assert_called_once_with()
+            mock_s3_get_object.assert_any_call(
+                bucket_name="weights",
+                key="scrfd/scrfd.onnx",
+            )
+            mock_s3_get_object.assert_any_call(
+                bucket_name="weights",
+                key="retinexformer/MST_Plus_Plus_8x1150.pth",
+            )
         else:
             _mock_retinexformer_processing.assert_not_called()
+            mock_ssm.assert_called_once_with()
+            mock_s3_get_object.assert_any_call(
+                bucket_name="weights",
+                key="scrfd/scrfd.onnx",
+            )
         if use_correction_lm:
             _mock_gfpgan_processing.assert_called_once()
         else:
