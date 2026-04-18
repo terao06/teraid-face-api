@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from einops import rearrange
 import math
 import warnings
-from fvcore.nn import FlopCountAnalysis
 
 
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):
