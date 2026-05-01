@@ -172,3 +172,4 @@ local_setting/local_s3/local_buckets/manuals/1/1/*
 !local_setting/local_s3/local_buckets/manuals/1/1/.gitkeep
 # aiの学習済みモデル用重みファイル
 *.pth
+*.onnx
