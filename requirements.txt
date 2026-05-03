@@ -13,3 +13,4 @@ realesrgan
 scrfd
 fvcore
 boto3
+mediapipe

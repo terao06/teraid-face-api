@@ -19,7 +19,7 @@ paths:
         Base64エンコードされた顔画像を受け取り、指定された処理を実行して返却します。
 
         `use_brightness_adjustment_lm`、`use_correction_lm`、`use_resolution_lm` を
-        段階的に有効化することで、明るさ補正、顔補正、解像度補正を適用できます。
+        段階的に有効化することで、角度補正、明るさ補正、顔補正、解像度補正を適用できます。
       operationId: faceImageProcess
       requestBody:
         required: true
@@ -33,6 +33,7 @@ paths:
                 value:
                   content: iVBORw0KGgoAAAANSUhEUgAA...
                   extension: png
+                  use_angle_correction: false
                   use_brightness_adjustment_lm: false
                   use_correction_lm: false
                   use_resolution_lm: false
@@ -41,6 +42,7 @@ paths:
                 value:
                   content: /9j/4AAQSkZJRgABAQAAAQABAAD...
                   extension: jpeg
+                  use_angle_correction: true
                   use_brightness_adjustment_lm: true
                   use_correction_lm: true
                   use_resolution_lm: true
@@ -94,6 +96,7 @@ components:
       required:
         - content
         - extension
+        - use_angle_correction
         - use_brightness_adjustment_lm
         - use_correction_lm
         - use_resolution_lm
@@ -104,6 +107,10 @@ components:
           example: iVBORw0KGgoAAAANSUhEUgAA...
         extension:
           $ref: '#/components/schemas/ExtensionType'
+        use_angle_correction:
+          type: boolean
+          description: 顔の角度調整利用有無
+          example: true
         use_brightness_adjustment_lm:
           type: boolean
           description: 明るさ調整機能の利用有無

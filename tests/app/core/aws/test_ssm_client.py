@@ -17,6 +17,7 @@ class TestSsmClient:
         assert ssm_client.realesrgan_weight == "realesrgan/RealESRGAN_x2plus.pth"
         assert ssm_client.retinexformer_weight == "retinexformer/MST_Plus_Plus_8x1150.pth"
         assert ssm_client.scrfd_weight == "scrfd/scrfd.onnx"
+        assert ssm_client.face_alignment_weight == "facealignment/face_landmarker.task"
 
     def test_get_parameter(self) -> None:
         SsmClient()._get_parameter("s3_endpoint") == "http://teraid-face-api-s3:9000"

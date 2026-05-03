@@ -8,6 +8,7 @@ from PIL import Image
 from app.models.requests.face_image_processing_request import ExtensionType
 from app.models.responses.face_image_processing_response import FaceImageProcessingResponse
 from app.helpers.validation_helper import ValidationHelper
+from app.ml.face_alignment import FaceAlignment
 from app.ml.retinexformer import Retinexformer
 from app.ml.gfpgan import Gfpgan
 from app.ml.realesrgan import RealEsrGan
@@ -20,6 +21,7 @@ class FaceImageProcessingService:
             self,
             content: str,
             extension: ExtensionType,
+            use_angle_correction: bool,
             use_brightness_adjustment_lm: bool,
             use_correction_lm: bool,
             use_resolution_lm: bool,
@@ -40,7 +42,16 @@ class FaceImageProcessingService:
         target_image_np = np.asarray(target_image)
         processing_image_np = target_image_np.copy()
 
-        normalized_image_np = target_image_np.astype(np.float32) / 255.0
+        if use_angle_correction:
+            face_alignment_weight = s3_client.get_object(
+                bucket_name=ssm_params.llm_weight_bucket,
+                key=ssm_params.face_alignment_weight
+            )
+            face_alignment = FaceAlignment(weight_bytes=BytesIO(face_alignment_weight))
+            processing_image_np = face_alignment.processing(image_np=processing_image_np)
+
+        normalized_image_np = processing_image_np.astype(np.float32) / 255.0
+
         if use_brightness_adjustment_lm:
             retinex_weight_bytes = s3_client.get_object(
                 bucket_name=ssm_params.llm_weight_bucket,

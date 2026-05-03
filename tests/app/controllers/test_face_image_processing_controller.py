@@ -3,7 +3,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.core.exceptions import FaceNotFoundException, MultipleFacesDetectionException
+from app.core.exceptions import (
+    FaceAlignmentError,
+    FaceNotFoundException,
+    MultipleFacesDetectionException,
+)
 from app.core.messages import ValidationMessages
 from app.controllers.face_image_processing_controller import FaceImageProcessingController
 from app.models.requests.face_image_processing_request import (
@@ -20,13 +24,14 @@ class TestFaceImageProcessingController:
     @pytest.mark.parametrize(
         (
             "extension",
+            "use_angle_correction",
             "use_brightness_adjustment_lm",
             "use_correction_lm",
             "use_resolution_lm",
         ),
         [
-            (ExtensionType.PNG, True, False, True),
-            (ExtensionType.JPEG, False, True, False),
+            (ExtensionType.PNG, True, True, False, True),
+            (ExtensionType.JPEG, False, False, True, False),
         ],
     )
     @patch.object(FaceImageProcessingService, "processing")
@@ -34,6 +39,7 @@ class TestFaceImageProcessingController:
         self,
         mock_processing: MagicMock,
         extension: ExtensionType,
+        use_angle_correction: bool,
         use_brightness_adjustment_lm: bool,
         use_correction_lm: bool,
         use_resolution_lm: bool,
@@ -41,6 +47,7 @@ class TestFaceImageProcessingController:
         request = FaceImageProcessingRequest(
             content="encoded-image",
             extension=extension,
+            use_angle_correction=use_angle_correction,
             use_brightness_adjustment_lm=use_brightness_adjustment_lm,
             use_correction_lm=use_correction_lm,
             use_resolution_lm=use_resolution_lm,
@@ -58,6 +65,7 @@ class TestFaceImageProcessingController:
         mock_processing.assert_called_once_with(
             content="encoded-image",
             extension=extension,
+            use_angle_correction=use_angle_correction,
             use_brightness_adjustment_lm=use_brightness_adjustment_lm,
             use_correction_lm=use_correction_lm,
             use_resolution_lm=use_resolution_lm,
@@ -67,6 +75,7 @@ class TestFaceImageProcessingController:
         ("raised_exception", "expected_status_code", "expected_detail"),
         [
             (FaceNotFoundException(), 404, ValidationMessages.FACE_NOT_FOUND),
+            (FaceAlignmentError(), 404, ValidationMessages.ANGLE_CORRECTION_ERROR),
             (
                 MultipleFacesDetectionException(),
                 409,
@@ -75,6 +84,7 @@ class TestFaceImageProcessingController:
         ],
         ids=[
             "face_not_found_maps_to_404",
+            "face_alignment_error_maps_to_404",
             "multiple_faces_maps_to_409",
         ],
     )
@@ -89,6 +99,7 @@ class TestFaceImageProcessingController:
         request = FaceImageProcessingRequest(
             content="encoded-image",
             extension=ExtensionType.PNG,
+            use_angle_correction=False,
             use_brightness_adjustment_lm=False,
             use_correction_lm=False,
             use_resolution_lm=False,

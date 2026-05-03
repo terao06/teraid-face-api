@@ -20,7 +20,7 @@ class TestS3Client:
             key="gfpgan/Readme.md",
         )
 
-        assert content.startswith(b"# gfpgan")
+        assert content.startswith(b"# GFPGAN weights")
 
     def test_get_object_with_missing_key(self) -> None:
         s3_client = S3Client(s3_endpoint=ENDPOINT_URL)

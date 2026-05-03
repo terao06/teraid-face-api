@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from io import BytesIO
-from pathlib import Path
 
 import torch
 from torch import nn

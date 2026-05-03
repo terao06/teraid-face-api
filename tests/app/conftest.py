@@ -84,6 +84,7 @@ def mock_ssm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
             realesrgan_weight="realesrgan/RealESRGAN_x2plus.pth",
             retinexformer_weight="retinexformer/MST_Plus_Plus_8x1150.pth",
             scrfd_weight="scrfd/scrfd.onnx",
+            face_alignment_weight="facealignment/face_landmarker.task",
         )
     )
     monkeypatch.setattr(face_image_processing_service_module, "SsmClient", ssm_client_mock)

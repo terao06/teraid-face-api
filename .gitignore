@@ -173,3 +173,4 @@ local_setting/local_s3/local_buckets/manuals/1/1/*
 # aiの学習済みモデル用重みファイル
 *.pth
 *.onnx
+*.task

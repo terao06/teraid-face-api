@@ -34,6 +34,8 @@ class TestFaceImageProcessing:
     REALESRGAN_RESULT_IMAGE_PATH = Path(
         "tests/test_data/images/realesrgan/result_face.png"
     )
+    TEST_ANGLE_COLLECT_IMAGE_PATH = Path("tests/test_data/images/facealignment/test_face.png")
+    ANGLE_COLLECT_RESULT_IMAGE_PATH = Path("tests/test_data/images/facealignment/result_face.png")
 
     def _encode_image(self, image: Image.Image, extension: ExtensionType) -> str:
         buffer = BytesIO()
@@ -109,6 +111,7 @@ class TestFaceImageProcessing:
         request = FaceImageProcessingRequest(
             content="encoded-image",
             extension=request_extension,
+            use_angle_correction=True,
             use_brightness_adjustment_lm=True,
             use_correction_lm=False,
             use_resolution_lm=False,
@@ -142,6 +145,14 @@ class TestFaceImageProcessing:
             ),
             (
                 HTTPException(
+                    status_code=404,
+                    detail=ValidationMessages.ANGLE_CORRECTION_ERROR,
+                ),
+                404,
+                ValidationMessages.ANGLE_CORRECTION_ERROR,
+            ),
+            (
+                HTTPException(
                     status_code=409,
                     detail=ValidationMessages.MULTIPLE_FACES_DETECTED,
                 ),
@@ -151,6 +162,7 @@ class TestFaceImageProcessing:
         ],
         ids=[
             "face_not_found_returns_404",
+            "angle_correction_error_returns_404",
             "multiple_faces_returns_409",
         ],
     )
@@ -168,6 +180,7 @@ class TestFaceImageProcessing:
             {
                 "content": "encoded-image",
                 "extension": ExtensionType.PNG.value,
+                "use_angle_correction": False,
                 "use_brightness_adjustment_lm": False,
                 "use_correction_lm": False,
                 "use_resolution_lm": False,
@@ -179,6 +192,7 @@ class TestFaceImageProcessing:
 
     @pytest.mark.parametrize(
         (
+            "use_angle_correction",
             "use_brightness_adjustment_lm",
             "use_correction_lm",
             "use_resolution_lm",
@@ -187,16 +201,18 @@ class TestFaceImageProcessing:
             "expected_image_path",
         ),
         [
-            (False, False, False, 200, TEST_FACE_IMAGE_PATH, TEST_FACE_IMAGE_PATH),
-            (True, False, False, 200, TEST_FACE_IMAGE_PATH, RETINEXFORMER_RESULT_IMAGE_PATH),
-            (True, True, False, 200, TEST_FACE_IMAGE_PATH, GFPGAN_RESULT_IMAGE_PATH),
-            (True, True, True, 200, TEST_FACE_IMAGE_PATH, REALESRGAN_RESULT_IMAGE_PATH),
+            (False, False, False, False, 200, TEST_FACE_IMAGE_PATH, TEST_FACE_IMAGE_PATH),
+            (False, True, False, False, 200, TEST_FACE_IMAGE_PATH, RETINEXFORMER_RESULT_IMAGE_PATH),
+            (False, True, True, False, 200, TEST_FACE_IMAGE_PATH, GFPGAN_RESULT_IMAGE_PATH),
+            (False, True, True, True, 200, TEST_FACE_IMAGE_PATH, REALESRGAN_RESULT_IMAGE_PATH),
+            (True, False, False, False, 200, TEST_ANGLE_COLLECT_IMAGE_PATH, ANGLE_COLLECT_RESULT_IMAGE_PATH),
         ],
     )
     @pytest.mark.usefixtures("initialize_s3")
     def test_face_image_process_with_real_image(
         self,
         mock_ssm: MagicMock,
+        use_angle_correction: bool,
         use_brightness_adjustment_lm: bool,
         use_correction_lm: bool,
         use_resolution_lm: bool,
@@ -213,6 +229,7 @@ class TestFaceImageProcessing:
             {
                 "content": encoded_image,
                 "extension": ExtensionType.PNG.value,
+                "use_angle_correction": use_angle_correction,
                 "use_brightness_adjustment_lm": use_brightness_adjustment_lm,
                 "use_correction_lm": use_correction_lm,
                 "use_resolution_lm": use_resolution_lm,

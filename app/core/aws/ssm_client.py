@@ -13,6 +13,7 @@ class SsmClient:
     realesrgan_weight: str
     retinexformer_weight: str
     scrfd_weight: str
+    face_alignment_weight: str
 
     def __init__(self):
         """
@@ -35,6 +36,7 @@ class SsmClient:
         self.realesrgan_weight = self._get_string_parameter(name="realesrgan_weight")
         self.retinexformer_weight = self._get_string_parameter(name="retinexformer_weight")
         self.scrfd_weight = self._get_string_parameter(name="scrfd_weight")
+        self.face_alignment_weight = self._get_string_parameter(name="face_alignment_weight")
 
     def _get_parameter(self, name: str, with_decryption: bool = True) -> Union[str, Dict[str, Any]]:
         """
