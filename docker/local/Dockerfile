@@ -28,6 +28,8 @@ RUN echo "deb http://ftp.jp.debian.org/debian bookworm main" > /etc/apt/sources.
     poppler-utils \
     tesseract-ocr \
     libgl1 \
+    libgles2 \
+    libegl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Poetryのインストール
