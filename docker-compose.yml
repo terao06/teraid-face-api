@@ -30,7 +30,7 @@ services:
     networks:
       - teraid-face-api-network
     restart: unless-stopped
-  
+
   teraid-face-api-s3:
     image: minio/minio
     container_name: teraid-face-api-s3

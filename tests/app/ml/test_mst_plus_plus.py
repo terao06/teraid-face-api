@@ -7,16 +7,16 @@ from PIL import Image
 import pytest
 import torch
 
-from app.ml.retinexformer import Retinexformer
-from app.ml.models.retinexformer import MST_Plus_Plus
+from app.ml.mst_plus_plus import MSTPlusPlus
+from app.ml.models.mst_plus_plus import MST_Plus_Plus
 
 
-TEST_IMAGE_PATH = Path("tests/test_data/images/retinexformer/test_face.png")
-RESULT_IMAGE_PATH = Path("tests/test_data/images/retinexformer/result_face.png")
-WEIGHT_PATH = Path("tests/test_data/s3/buckets/weights/retinexformer/MST_Plus_Plus_8x1150.pth")
+TEST_IMAGE_PATH = Path("tests/test_data/images/mst_plus_plus/test_face.png")
+RESULT_IMAGE_PATH = Path("tests/test_data/images/mst_plus_plus/result_face.png")
+WEIGHT_PATH = Path("tests/test_data/s3/buckets/weights/mst_plus_plus/MST_Plus_Plus_8x1150.pth")
 
 
-class TestRetinexformer:
+class TestMSTPlusPlus:
     @staticmethod
     def _dummy_weight_bytes() -> BytesIO:
         return BytesIO(b"dummy-weight-bytes")
@@ -26,7 +26,7 @@ class TestRetinexformer:
         return BytesIO(path.read_bytes())
 
     def test_load_np_as_tensor_converts_hwc_to_nchw(self) -> None:
-        former = Retinexformer(weight_bytes=self._dummy_weight_bytes())
+        former = MSTPlusPlus(weight_bytes=self._dummy_weight_bytes())
         image_np = np.arange(12, dtype=np.float32).reshape(2, 2, 3)
 
         tensor = former._load_np_as_tensor(image_np)
@@ -36,7 +36,7 @@ class TestRetinexformer:
         assert torch.equal(tensor[0, :, 0, 0], torch.tensor([0.0, 1.0, 2.0]))
 
     def test_tensor_to_numpy_clamps_and_returns_ndarray(self) -> None:
-        former = Retinexformer(weight_bytes=self._dummy_weight_bytes())
+        former = MSTPlusPlus(weight_bytes=self._dummy_weight_bytes())
         tensor = torch.tensor(
             [[
                 [[1.2, 0.5], [0.0, 0.1]],
@@ -54,13 +54,13 @@ class TestRetinexformer:
         assert np.array_equal(image_np[0, 0], np.array([255, 0, 51], dtype=np.uint8))
 
     def test_build_network_from_yaml_rejects_unexpected_network_type(self) -> None:
-        former = Retinexformer(weight_bytes=self._dummy_weight_bytes())
+        former = MSTPlusPlus(weight_bytes=self._dummy_weight_bytes())
 
         with pytest.raises(ValueError, match="Unexpected network type"):
             former._build_network_from_yaml({"network_g": {"type": "unexpected"}})
 
     def test_build_network_from_yaml_builds_mst_plus_plus(self) -> None:
-        former = Retinexformer(weight_bytes=self._dummy_weight_bytes())
+        former = MSTPlusPlus(weight_bytes=self._dummy_weight_bytes())
 
         model = former._build_network_from_yaml(
             {
@@ -82,15 +82,15 @@ class TestRetinexformer:
         assert model.conv_out.out_channels == 3
 
     @patch.object(torch, "load")
-    @patch.object(Retinexformer, "_build_network_from_yaml")
-    @patch.object(Retinexformer, "_load_yaml_opt", return_value={"network_g": {}})
+    @patch.object(MSTPlusPlus, "_build_network_from_yaml")
+    @patch.object(MSTPlusPlus, "_load_yaml_opt", return_value={"network_g": {}})
     def test_load_model_uses_params_ema_and_strips_module_prefix(
         self,
         _mock_load_yaml_opt: MagicMock,
         mock_build_network_from_yaml: MagicMock,
         mock_torch_load: MagicMock,
     ) -> None:
-        former = Retinexformer(weight_bytes=self._dummy_weight_bytes())
+        former = MSTPlusPlus(weight_bytes=self._dummy_weight_bytes())
         captured = {}
 
         class DummyModel:
@@ -122,7 +122,7 @@ class TestRetinexformer:
         _mock_load_yaml_opt.assert_called_once()
 
     def test_enhance_image_pads_to_factor_and_crops_back(self) -> None:
-        former = Retinexformer(weight_bytes=self._dummy_weight_bytes())
+        former = MSTPlusPlus(weight_bytes=self._dummy_weight_bytes())
         input_tensor = torch.arange(1 * 3 * 5 * 6, dtype=torch.float32).reshape(1, 3, 5, 6)
         captured = {}
 
@@ -138,15 +138,15 @@ class TestRetinexformer:
         assert torch.equal(output, input_tensor + 1)
 
     @patch.object(torch, "load")
-    @patch.object(Retinexformer, "_build_network_from_yaml")
-    @patch.object(Retinexformer, "_load_yaml_opt", return_value={"network_g": {}})
+    @patch.object(MSTPlusPlus, "_build_network_from_yaml")
+    @patch.object(MSTPlusPlus, "_load_yaml_opt", return_value={"network_g": {}})
     def test_load_model_seeks_weight_bytes_before_torch_load(
         self,
         _mock_load_yaml_opt: MagicMock,
         mock_build_network_from_yaml: MagicMock,
         mock_torch_load: MagicMock,
     ) -> None:
-        former = Retinexformer(weight_bytes=BytesIO(b"dummy-weight-bytes"))
+        former = MSTPlusPlus(weight_bytes=BytesIO(b"dummy-weight-bytes"))
         former.weight_bytes.read()
 
         class DummyModel:
@@ -173,7 +173,7 @@ class TestRetinexformer:
         test_image_np = np.asarray(test_image).astype(np.float32) / 255.0
         expected = np.asarray(Image.open(RESULT_IMAGE_PATH).convert("RGB"))
 
-        former = Retinexformer(weight_bytes=self._load_weight_bytes(WEIGHT_PATH))
+        former = MSTPlusPlus(weight_bytes=self._load_weight_bytes(WEIGHT_PATH))
         image_np = former.processing(image_np=test_image_np)
         diff = np.abs(image_np.astype(np.int16) - expected.astype(np.int16))
 
