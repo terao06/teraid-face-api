@@ -11,7 +11,7 @@ class SsmClient:
     gfpgan_resnet_weight: str
     gfpgan_parsenet_weight: str
     realesrgan_weight: str
-    retinexformer_weight: str
+    mst_plus_plus_weight: str
     scrfd_weight: str
     face_alignment_weight: str
 
@@ -34,7 +34,7 @@ class SsmClient:
         self.gfpgan_resnet_weight = self._get_string_parameter(name="gfpgan_resnet_weight")
         self.gfpgan_parsenet_weight = self._get_string_parameter(name="gfpgan_parsenet_weight")
         self.realesrgan_weight = self._get_string_parameter(name="realesrgan_weight")
-        self.retinexformer_weight = self._get_string_parameter(name="retinexformer_weight")
+        self.mst_plus_plus_weight = self._get_string_parameter(name="mst_plus_plus_weight")
         self.scrfd_weight = self._get_string_parameter(name="scrfd_weight")
         self.face_alignment_weight = self._get_string_parameter(name="face_alignment_weight")
 

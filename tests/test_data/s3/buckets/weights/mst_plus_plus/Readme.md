@@ -1,4 +1,4 @@
-# Retinexformer / MST++ weight
+# MST++ weight
 
 明るさ調整で使用するMST++のNTIRE向け重みを配置します。
 
@@ -29,6 +29,6 @@ python3 Enhancement/test_from_dataset.py --opt Options/MST_Plus_Plus_NTIRE_8x115
 
 ```json
 {
-  "retinexformer_weight": "retinexformer/MST_Plus_Plus_8x1150.pth"
+  "mst_plus_plus_weight": "mst_plus_plus/MST_Plus_Plus_8x1150.pth"
 }
 ```

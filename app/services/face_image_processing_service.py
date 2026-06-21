@@ -9,7 +9,7 @@ from app.models.requests.face_image_processing_request import ExtensionType
 from app.models.responses.face_image_processing_response import FaceImageProcessingResponse
 from app.helpers.validation_helper import ValidationHelper
 from app.ml.face_alignment import FaceAlignment
-from app.ml.retinexformer import Retinexformer
+from app.ml.mst_plus_plus import MSTPlusPlus
 from app.ml.gfpgan import Gfpgan
 from app.ml.realesrgan import RealEsrGan
 from app.core.aws.ssm_client import SsmClient
@@ -53,13 +53,13 @@ class FaceImageProcessingService:
         normalized_image_np = processing_image_np.astype(np.float32) / 255.0
 
         if use_brightness_adjustment_lm:
-            retinex_weight_bytes = s3_client.get_object(
+            mst_plus_plus_weight_bytes = s3_client.get_object(
                 bucket_name=ssm_params.llm_weight_bucket,
-                key=ssm_params.retinexformer_weight
+                key=ssm_params.mst_plus_plus_weight
             )
 
-            retinexformer = Retinexformer(weight_bytes=BytesIO(retinex_weight_bytes))
-            processing_image_np = retinexformer.processing(image_np=normalized_image_np)
+            mst_plus_plus = MSTPlusPlus(weight_bytes=BytesIO(mst_plus_plus_weight_bytes))
+            processing_image_np = mst_plus_plus.processing(image_np=normalized_image_np)
 
         if use_correction_lm:
             gfp_weight_bytes = s3_client.get_object(

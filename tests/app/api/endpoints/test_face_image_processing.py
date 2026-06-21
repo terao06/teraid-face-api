@@ -24,9 +24,9 @@ from app.models.responses.face_image_processing_response import (
 
 
 class TestFaceImageProcessing:
-    TEST_FACE_IMAGE_PATH = Path("tests/test_data/images/retinexformer/test_face.png")
-    RETINEXFORMER_RESULT_IMAGE_PATH = Path(
-        "tests/test_data/images/retinexformer/result_face.png"
+    TEST_FACE_IMAGE_PATH = Path("tests/test_data/images/mst_plus_plus/test_face.png")
+    MST_PLUS_PLUS_RESULT_IMAGE_PATH = Path(
+        "tests/test_data/images/mst_plus_plus/result_face.png"
     )
     GFPGAN_RESULT_IMAGE_PATH = Path(
         "tests/test_data/images/gfpgan/result_face.png"
@@ -202,7 +202,7 @@ class TestFaceImageProcessing:
         ),
         [
             (False, False, False, False, 200, TEST_FACE_IMAGE_PATH, TEST_FACE_IMAGE_PATH),
-            (False, True, False, False, 200, TEST_FACE_IMAGE_PATH, RETINEXFORMER_RESULT_IMAGE_PATH),
+            (False, True, False, False, 200, TEST_FACE_IMAGE_PATH, MST_PLUS_PLUS_RESULT_IMAGE_PATH),
             (False, True, True, False, 200, TEST_FACE_IMAGE_PATH, GFPGAN_RESULT_IMAGE_PATH),
             (False, True, True, True, 200, TEST_FACE_IMAGE_PATH, REALESRGAN_RESULT_IMAGE_PATH),
             (True, False, False, False, 200, TEST_ANGLE_COLLECT_IMAGE_PATH, ANGLE_COLLECT_RESULT_IMAGE_PATH),

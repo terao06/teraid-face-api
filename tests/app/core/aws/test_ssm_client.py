@@ -15,7 +15,7 @@ class TestSsmClient:
         assert ssm_client.gfpgan_resnet_weight == "gfpgan/detection_Resnet50_Final.pth"
         assert ssm_client.gfpgan_parsenet_weight == "gfpgan/parsing_parsenet.pth"
         assert ssm_client.realesrgan_weight == "realesrgan/RealESRGAN_x2plus.pth"
-        assert ssm_client.retinexformer_weight == "retinexformer/MST_Plus_Plus_8x1150.pth"
+        assert ssm_client.mst_plus_plus_weight == "mst_plus_plus/MST_Plus_Plus_8x1150.pth"
         assert ssm_client.scrfd_weight == "scrfd/scrfd.onnx"
         assert ssm_client.face_alignment_weight == "facealignment/face_landmarker.task"
 

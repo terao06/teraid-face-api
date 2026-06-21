@@ -10,7 +10,7 @@ from app.helpers.validation_helper import ValidationHelper
 from app.ml.face_alignment import FaceAlignment
 from app.ml.gfpgan import Gfpgan
 from app.ml.realesrgan import RealEsrGan
-from app.ml.retinexformer import Retinexformer
+from app.ml.mst_plus_plus import MSTPlusPlus
 from app.models.requests.face_image_processing_request import ExtensionType
 from app.models.responses.face_image_processing_response import FaceImageProcessingResponse
 from app.services.face_image_processing_service import FaceImageProcessingService
@@ -55,7 +55,7 @@ def dummy_face_alignment_processing(*, image_np: np.ndarray) -> np.ndarray:
     return FACE_ALIGNMENT_OUTPUT
 
 
-def dummy_retinexformer_processing(*, image_np: np.ndarray) -> np.ndarray:
+def dummy_mst_plus_plus_processing(*, image_np: np.ndarray) -> np.ndarray:
     CAPTURED_RETINEX_INPUTS.append(image_np)
     return RETINEX_OUTPUT
 
@@ -79,7 +79,7 @@ def dummy_get_object(*, bucket_name: str, key: str) -> bytes:
     assert key in {
         "scrfd/scrfd.onnx",
         "facealignment/face_landmarker.task",
-        "retinexformer/MST_Plus_Plus_8x1150.pth",
+        "mst_plus_plus/MST_Plus_Plus_8x1150.pth",
         "gfpgan/GFPGANv.pth",
         "gfpgan/detection_Resnet50_Final.pth",
         "gfpgan/parsing_parsenet.pth",
@@ -157,12 +157,12 @@ class TestFaceImageProcessingService:
     @patch.object(ValidationHelper, "validation_with_face", side_effect=dummy_validation_with_face)
     @patch.object(RealEsrGan, "processing", side_effect=dummy_realesrgan_processing)
     @patch.object(Gfpgan, "processing", side_effect=dummy_gfpgan_processing)
-    @patch.object(Retinexformer, "processing", side_effect=dummy_retinexformer_processing)
+    @patch.object(MSTPlusPlus, "processing", side_effect=dummy_mst_plus_plus_processing)
     @patch.object(FaceAlignment, "processing", side_effect=dummy_face_alignment_processing)
     def test_processing_returns_expected_image_and_extension(
         self,
         _mock_face_alignment_processing: MagicMock,
-        _mock_retinexformer_processing: MagicMock,
+        _mock_mst_plus_plus_processing: MagicMock,
         _mock_gfpgan_processing: MagicMock,
         _mock_realesrgan_processing: MagicMock,
         _mock_validation_with_face: MagicMock,
@@ -252,7 +252,7 @@ class TestFaceImageProcessingService:
         else:
             _mock_face_alignment_processing.assert_not_called()
         if use_brightness_adjustment_lm:
-            _mock_retinexformer_processing.assert_called_once()
+            _mock_mst_plus_plus_processing.assert_called_once()
             mock_ssm.assert_called_once_with()
             mock_s3_get_object.assert_any_call(
                 bucket_name="weights",
@@ -260,10 +260,10 @@ class TestFaceImageProcessingService:
             )
             mock_s3_get_object.assert_any_call(
                 bucket_name="weights",
-                key="retinexformer/MST_Plus_Plus_8x1150.pth",
+                key="mst_plus_plus/MST_Plus_Plus_8x1150.pth",
             )
         else:
-            _mock_retinexformer_processing.assert_not_called()
+            _mock_mst_plus_plus_processing.assert_not_called()
             mock_ssm.assert_called_once_with()
             mock_s3_get_object.assert_any_call(
                 bucket_name="weights",

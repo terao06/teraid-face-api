@@ -9,16 +9,16 @@ from PIL import Image
 import torch
 import torch.nn.functional as F
 
-from app.ml.models.retinexformer import MST_Plus_Plus
+from app.ml.models.mst_plus_plus import MST_Plus_Plus
 
 
 ML_ROOT = Path(__file__).resolve().parent
 
 
-class Retinexformer:
+class MSTPlusPlus:
     def __init__(self, weight_bytes: BytesIO) -> None:
         self.weight_bytes = weight_bytes
-        self.opt_path = ML_ROOT / "configs" / "retinexformer" / "MST_Plus_Plus_NTIRE_8x1150.yml"
+        self.opt_path = ML_ROOT / "configs" / "mst_plus_plus" / "MST_Plus_Plus_NTIRE_8x1150.yml"
         self.device = torch.device("cuda")
 
     def _load_np_as_tensor(self, image_np: np) -> torch.Tensor:
